@@ -31,6 +31,7 @@ Tilaukset välitetään JSON-muodossa:
 - .NET 8.0 SDK
 - Visual Studio 2022 tai Visual Studio Code
 - Git
+- Docker (suositeltu tuotantokäyttöön)
 
 ### Tuotantoympäristö
 - .NET 8.0 Runtime
@@ -77,29 +78,65 @@ Tilaukset välitetään JSON-muodossa:
 1. Julkaise OrderProcessingService:
    ```bash
    cd src/OrderProcessingService
+   # Windows x64 julkaisu
    dotnet publish -c Release -r win-x64 --self-contained true
+   # tai Linux x64 julkaisu
+   dotnet publish -c Release -r linux-x64 --self-contained true
    ```
 
 2. Julkaise OrderSubmissionService:
    ```bash
    cd src/OrderSubmissionService
+   # Windows x64 julkaisu
    dotnet publish -c Release -r win-x64 --self-contained true
+   # tai Linux x64 julkaisu
+   dotnet publish -c Release -r linux-x64 --self-contained true
    ```
 
-### 4. Tuotantoversion käynnistys
+Julkaistut versiot löytyvät seuraavista hakemistoista:
+- Windows: `bin/Release/net8.0/win-x64/publish/`
+- Linux: `bin/Release/net8.0/linux-x64/publish/`
 
-1. Käynnistä OrderProcessingService:
+### 4. Tuotantoversion käynnistys ja käyttö
+
+1. Kopioi julkaistut tiedostot kohdeympäristöön:
+   - Kopioi koko publish-hakemiston sisältö
+   - Varmista että `appsettings.json` on mukana
+   - Säilytä hakemistorakenne
+
+2. Käynnistä OrderProcessingService:
    ```bash
-   cd src/OrderProcessingService/bin/Release/net8.0/win-x64/publish
+   # Windows
+   cd OrderProcessingService/bin/Release/net8.0/win-x64/publish
    ./OrderProcessingService.exe
+   # tai Linux
+   cd OrderProcessingService/bin/Release/net8.0/linux-x64/publish
+   ./OrderProcessingService
    ```
 
-2. Lähetä tilaus OrderSubmissionService:llä:
+3. Lähetä tilaus OrderSubmissionService:llä:
    ```bash
-   # Syntaksi: OrderSubmissionService.exe order "<asiakkaan nimi>" "<tuotteen nimi>"
-   cd src/OrderSubmissionService/bin/Release/net8.0/win-x64/publish
-   ./OrderSubmissionService.exe order "Asiakkaan Nimi" "Tuotteen Nimi"
+   # Windows syntaksi
+   cd OrderSubmissionService/bin/Release/net8.0/win-x64/publish
+   OrderSubmissionService.exe order "<asiakkaan nimi>" "<tuotteen nimi>"
+   
+   # Linux syntaksi
+   cd OrderSubmissionService/bin/Release/net8.0/linux-x64/publish
+   ./OrderSubmissionService order "<asiakkaan nimi>" "<tuotteen nimi>"
+   
+   # Esimerkki:
+   OrderSubmissionService.exe order "Matti Meikäläinen" "Tuote ABC"
    ```
+
+4. Tarkista palvelun tila:
+   - Katso konsolista tulostuvia lokiviestejä
+   - Tarkista metriikat osoitteesta http://localhost:9090/metrics
+   - Seuraa Grafana-dashboardeja osoitteessa http://localhost:3000
+
+Huomioitavaa:
+- Varmista että MQTT-broker on käynnissä ja saavutettavissa
+- Tarkista `appsettings.json` asetukset kohdeympäristöä varten
+- Palomuurin pitää sallia määritetyt portit (oletuksena 1883 MQTT:lle)
 
 ## Konfigurointi
 
@@ -327,3 +364,115 @@ Testit voi ajaa komennolla:
 ```bash
 dotnet test
 ``` 
+
+## Esimerkit
+
+### Komentorivin käyttö
+
+1. Tilauksen lähettäminen:
+```bash
+dotnet run -- order "CustomerName" "ProductName"
+```
+
+2. Tilauksen JSON-formaatti:
+```json
+{
+  "orderId": "550e8400-e29b-41d4-a716-446655440000",
+  "customerName": "CustomerName",
+  "productName": "ProductName",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "status": "New"
+}
+```
+
+## Testaus
+
+### Testien ajaminen
+
+Testit voidaan ajaa seuraavilla komennoilla:
+
+```bash
+# Kaikki testit
+dotnet test
+
+# Yksikkötestit
+dotnet test --filter Category=Unit
+
+# Integraatiotestit
+dotnet test --filter Category=Integration
+```
+
+### Testausstrategia
+
+1. Yksikkötestit:
+   - Tilauksen validointi
+   - JSON-serialisointi
+   - Viestien muotoilu
+   - Uudelleenyrityslogiikka
+
+2. Integraatiotestit:
+   - MQTT-yhteyden muodostus
+   - Viestien julkaisu ja vastaanotto
+   - Metriikoiden keräys
+
+3. End-to-end testit:
+   - Tilauksen lähetys ja käsittely
+   - Virhetilanteiden käsittely
+   - Suorituskykytestit
+
+### Testiesimerkki
+
+```csharp
+[Fact]
+public void ValidateOrder_WithValidData_ShouldPass()
+{
+    // Arrange
+    var order = new Order
+    {
+        OrderId = Guid.NewGuid().ToString(),
+        CustomerName = "Test Customer",
+        ProductName = "Test Product",
+        Timestamp = DateTime.UtcNow,
+        Status = OrderStatus.New
+    };
+
+    // Act
+    var result = OrderValidator.Validate(order);
+
+    // Assert
+    Assert.True(result.IsValid);
+}
+```
+
+## Skaalautuvuus
+
+### Useamman instanssin ajaminen
+
+Palvelut on suunniteltu skaalautumaan horisontaalisesti:
+
+1. OrderSubmissionService:
+   - Tilaton palvelu
+   - Voidaan ajaa useita rinnakkaisia instansseja
+   - Jokainen instanssi saa uniikin client ID:n
+
+2. OrderProcessingService:
+   - Tukee useita rinnakkaisia instansseja
+   - Duplikaattitilausten käsittely estetty
+   - Tilaukset jaetaan automaattisesti vapaana oleville instansseille
+
+Käynnistys eri porteilla:
+
+```bash
+# OrderProcessingService instanssi 1
+dotnet run --urls="http://localhost:5001"
+
+# OrderProcessingService instanssi 2
+dotnet run --urls="http://localhost:5002"
+```
+
+### Kuormantasaus
+
+MQTT-broker (Mosquitto) hoitaa viestien jakamisen automaattisesti:
+- Viestit jaetaan round-robin periaatteella
+- Käsittelemättömät viestit säilyvät jonossa
+- Viestit toimitetaan vähintään kerran (QoS 1) 

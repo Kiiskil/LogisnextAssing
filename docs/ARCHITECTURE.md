@@ -2,7 +2,7 @@
 
 ## Overview
 
-The system consists of two microservices that communicate via an MQTT message queue. The system is designed to be scalable and fault-tolerant.
+The system consists of two microservices and a shared library that communicate via an MQTT message queue. The system is designed to be scalable and fault-tolerant.
 
 ## Components
 
@@ -12,26 +12,34 @@ The system consists of two microservices that communicate via an MQTT message qu
 - Validates orders
 - Generates unique order IDs
 - Publishes orders to MQTT queue
-- Collects metrics to Prometheus
+- Collects metrics using prometheus-net
 
 Technologies:
 - .NET 8.0
 - MQTTnet
-- Prometheus-net
-- Polly (for retries)
+- prometheus-net
+- Custom retry policy
 
 ### OrderProcessingService
 
 - Listens to MQTT queue
 - Processes orders
 - Updates order status
-- Collects metrics to Prometheus
+- Collects metrics using prometheus-net
+- Handles duplicate orders with 5-minute window
 
 Technologies:
 - .NET 8.0
 - MQTTnet
-- Prometheus-net
-- Polly (for retries)
+- prometheus-net
+- Custom retry policy
+
+### Common Library
+
+- Shared models (Order, OrderStatus)
+- Shared interfaces (IMqttPublisherService, IMqttSubscriberService)
+- Shared services (MetricsService)
+- Configuration models (MqttSettings, RetryPolicy)
 
 ### Infrastructure
 
@@ -39,106 +47,69 @@ Technologies:
 
 - Acts as a message queue between services
 - Supports QoS levels (At least once)
-- Optional TLS encryption capability
-- Optional user authentication
-- Supports persistent storage
+- Simple configuration without authentication
+- Default port 1883
 
-Configuration for clustering:
+Configuration:
 ```conf
-# Master node configuration
 listener 1883
-connection_messages true
 allow_anonymous true
-
-# Slave node configuration
-connection master
-address master-node:1883
-topic # both 2
 ```
 
 #### Prometheus
 
 - Collects metrics from both services
-- Supports alert configuration
-- Provides PromQL query language
-
-#### Grafana
-
-- Visualizes Prometheus metrics
-- Supports dashboard creation
-- Alert configuration capability
+- Metrics exposed on configured ports
+- Basic metrics: processed orders, failed orders, processing time
 
 ## Security
 
-### TLS Encryption (Optional)
+Currently implemented:
+- Basic error handling
+- Duplicate order detection
+- Input validation
 
-- MQTT connections can be encrypted with TLS
-- Support for certificate validation
-- User authentication capability
-- Configuration in appsettings.json:
-```json
-{
-  "MqttSettings": {
-    "UseTls": true,
-    "CertificatePath": "/path/to/cert",
-    "Username": "user",
-    "Password": "pass"
-  }
-}
-```
-
-### Metrics
-
-- Prometheus ports only in internal network
-- Basic Authentication in Grafana
-- HTTPS support for Grafana
+Planned future improvements:
+- TLS encryption for MQTT
+- Authentication for MQTT
+- Metrics endpoint security
 
 ## Scalability
 
-### Horizontal Scaling
+### Current Implementation
 
-- OrderSubmissionService can be scaled to multiple instances
-- OrderProcessingService can be scaled to multiple instances
-- MQTT broker supports clustering with master-slave configuration
-
-Example scaling configuration:
-```bash
-# Start multiple OrderProcessingService instances
-dotnet run --urls="http://localhost:5001"
-dotnet run --urls="http://localhost:5002"
-
-# Each instance automatically gets unique client ID
-# Duplicate order handling is implemented in OrderProcessor
-```
+- OrderSubmissionService is command-line tool that can be run multiple times
+- OrderProcessingService handles duplicate orders with 5-minute window
+- MQTT broker handles message distribution
 
 ### Fault Tolerance
 
-- Retry logic with Polly library
-- MQTT QoS level ensures message delivery
-- Prometheus metrics help detect issues
+- Custom retry policy for MQTT connections
+- Error handling and logging
+- Metrics for monitoring failures
 
 ## Monitoring
 
 ### Metrics
 
+Currently implemented:
 - Number of processed orders
 - Number of failed orders
 - Order processing time
-- Queue length
-- Number of retries
+- Number of created orders
 
 ### Logging
 
-- Structured logging
+- Structured logging with Microsoft.Extensions.Logging
 - Different log levels (Info, Warning, Error)
-- Centralized log management capability
+- Console output
 
 ## Future Development
 
-1. Integration tests with Docker-based MQTT broker
-2. End-to-end tests
-3. Metrics visualization in Grafana
-4. TLS certificate implementation
-5. Expansion of retry logic
-6. Centralized log management
-7. Automatic scaling 
+1. Docker support for services
+2. Integration tests with Docker-based MQTT broker
+3. End-to-end tests
+4. Metrics visualization
+5. TLS and authentication for MQTT
+6. Expanded retry logic
+7. Health checks implementation 

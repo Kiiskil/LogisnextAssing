@@ -1,12 +1,11 @@
 using Common.Models;
-using Common.Services;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Client;
 using Polly;
 using Polly.Retry;
 
-namespace OrderProcessingService.Services;
+namespace Common.Services;
 
 public class MqttSubscriberService : IMqttSubscriberService
 {
@@ -48,7 +47,7 @@ public class MqttSubscriberService : IMqttSubscriberService
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
                     _logger.LogWarning(exception, 
-                        "Yritys {RetryCount}/{MaxRetries} epäonnistui. Odotetaan {DelaySeconds} sekuntia.",
+                        "Attempt {RetryCount}/{MaxRetries} failed. Waiting {DelaySeconds} seconds.",
                         retryCount, _settings.RetryPolicy.MaxRetries, timeSpan.TotalSeconds);
                 });
     }
@@ -57,21 +56,21 @@ public class MqttSubscriberService : IMqttSubscriberService
     {
         _isConnected = false;
         _isSubscribed = false;
-        _logger.LogWarning("MQTT-yhteys katkesi: {Reason}", e.Reason);
+        _logger.LogWarning("MQTT connection lost: {Reason}", e.Reason);
 
         try
         {
             await _connectionLock.WaitAsync();
             try 
             {
-                // Odotetaan pidempi aika ennen uudelleenyhdistämistä
+                // Wait longer before reconnecting
                 await Task.Delay(TimeSpan.FromSeconds(5));
 
                 if (_client != null && _options != null && !_client.IsConnected)
                 {
                     await _client.ConnectAsync(_options);
                     
-                    // Odotetaan yhteyden muodostumista
+                    // Wait for connection
                     var timeout = TimeSpan.FromSeconds(10);
                     var start = DateTime.UtcNow;
                     while (!_isConnected && DateTime.UtcNow - start < timeout)
@@ -81,12 +80,12 @@ public class MqttSubscriberService : IMqttSubscriberService
 
                     if (!_isConnected)
                     {
-                        throw new TimeoutException("MQTT-yhteyden muodostaminen aikakatkaistiin");
+                        throw new TimeoutException("MQTT connection timed out");
                     }
 
-                    _logger.LogInformation("Yhteys muodostettu uudelleen");
+                    _logger.LogInformation("Connection re-established");
 
-                    // Tilataan aihe uudelleen jos se on asetettu
+                    // Resubscribe if topic was set
                     if (!string.IsNullOrEmpty(_currentTopic))
                     {
                         await SubscribeToTopicAsync(_currentTopic);
@@ -100,7 +99,7 @@ public class MqttSubscriberService : IMqttSubscriberService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Virhe yhteyden uudelleenmuodostamisessa");
+            _logger.LogError(ex, "Error reconnecting");
         }
     }
 
@@ -112,7 +111,7 @@ public class MqttSubscriberService : IMqttSubscriberService
             var messageId = Convert.ToBase64String(e.ApplicationMessage.PayloadSegment.ToArray());
             if (_processedMessageIds.Contains(messageId))
             {
-                _logger.LogInformation("Viesti on jo käsitelty: {MessageId}", messageId);
+                _logger.LogInformation("Message already processed: {MessageId}", messageId);
                 return;
             }
 
@@ -121,10 +120,10 @@ public class MqttSubscriberService : IMqttSubscriberService
 
             var startTime = DateTime.UtcNow;
 
-            // Kutsutaan vanhaa messageHandler-delegaattia
+            // Call old message handler delegate
             _messageHandler?.Invoke(message);
 
-            // Kutsutaan uutta MessageReceived-tapahtumaa
+            // Call new MessageReceived event
             if (MessageReceived != null)
             {
                 await MessageReceived.Invoke(topic, message);
@@ -135,7 +134,7 @@ public class MqttSubscriberService : IMqttSubscriberService
             _metrics.IncrementProcessedOrders();
             _processedMessageIds.Add(messageId);
 
-            // Siivotaan vanhat viestit (pidetään vain viimeiset 1000)
+            // Clean old messages (keep only last 1000)
             if (_processedMessageIds.Count > 1000)
             {
                 _processedMessageIds.Clear();
@@ -180,7 +179,7 @@ public class MqttSubscriberService : IMqttSubscriberService
                 _client.ConnectedAsync += async e =>
                 {
                     _isConnected = true;
-                    _logger.LogInformation("MQTT-yhteys muodostettu");
+                    _logger.LogInformation("MQTT connection established");
                     await Task.CompletedTask;
                 };
 
@@ -188,7 +187,7 @@ public class MqttSubscriberService : IMqttSubscriberService
 
                 await _client.ConnectAsync(_options);
                 
-                // Odotetaan yhteyden muodostumista
+                // Wait for connection
                 var timeout = TimeSpan.FromSeconds(10);
                 var start = DateTime.UtcNow;
                 while (!_isConnected && DateTime.UtcNow - start < timeout)
@@ -198,15 +197,15 @@ public class MqttSubscriberService : IMqttSubscriberService
 
                 if (!_isConnected)
                 {
-                    throw new TimeoutException("MQTT-yhteyden muodostaminen aikakatkaistiin");
+                    throw new TimeoutException("MQTT connection timed out");
                 }
 
-                _logger.LogInformation("Yhdistetty MQTT-brokeriin: {BrokerAddress}:{BrokerPort}", 
+                _logger.LogInformation("Connected to MQTT broker: {BrokerAddress}:{BrokerPort}", 
                     _settings.BrokerAddress, _settings.BrokerPort);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Virhe MQTT-yhteyden muodostamisessa");
+                _logger.LogError(ex, "Error establishing MQTT connection");
                 throw;
             }
         });
@@ -216,7 +215,7 @@ public class MqttSubscriberService : IMqttSubscriberService
     {
         if (_isSubscribed)
         {
-            _logger.LogInformation("Aihe {Topic} on jo tilattu", topic);
+            _logger.LogInformation("Topic {Topic} is already subscribed", topic);
             return;
         }
 
@@ -227,7 +226,7 @@ public class MqttSubscriberService : IMqttSubscriberService
         await _client!.SubscribeAsync(subscribeOptions);
         _isSubscribed = true;
         _currentTopic = topic;
-        _logger.LogInformation("Tilattu aihe: {Topic}", topic);
+        _logger.LogInformation("Subscribed to topic: {Topic}", topic);
     }
 
     public async Task SubscribeAsync(string topic)
@@ -244,7 +243,7 @@ public class MqttSubscriberService : IMqttSubscriberService
 
                 if (_client == null)
                 {
-                    throw new InvalidOperationException("MQTT-asiakasta ei voitu luoda");
+                    throw new InvalidOperationException("Could not create MQTT client");
                 }
 
                 await SubscribeToTopicAsync(topic);
@@ -273,7 +272,7 @@ public class MqttSubscriberService : IMqttSubscriberService
         _isSubscribed = false;
         _currentTopic = null;
         _messageHandler = null;
-        _logger.LogInformation("Tilaus peruttu aiheesta: {Topic}", topic);
+        _logger.LogInformation("Unsubscribed from topic: {Topic}", topic);
     }
 
     public async Task DisconnectAsync()
@@ -285,7 +284,7 @@ public class MqttSubscriberService : IMqttSubscriberService
             _isSubscribed = false;
             _currentTopic = null;
             _messageHandler = null;
-            _logger.LogInformation("Yhteys MQTT-brokeriin katkaistu");
+            _logger.LogInformation("Disconnected from MQTT broker");
         }
     }
 } 

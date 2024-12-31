@@ -31,7 +31,7 @@ public class OrderProcessor
     {
         if (_isProcessing)
         {
-            throw new InvalidOperationException("Tilausten käsittely on jo käynnissä");
+            throw new InvalidOperationException("Order processing is already running");
         }
 
         try
@@ -56,7 +56,7 @@ public class OrderProcessor
                     var order = JsonSerializer.Deserialize<Order>(message);
                     if (order == null)
                     {
-                        _logger.LogError("Virheellinen tilaus: {Message}", message);
+                        _logger.LogError("Invalid order: {Message}", message);
                         await _publisher.PublishAsync("orders/error", "Error processing order: Invalid JSON");
                         _metrics.IncrementFailedOrders();
                         return;
@@ -67,14 +67,14 @@ public class OrderProcessor
                     {
                         if (DateTime.UtcNow - processedTime < TimeSpan.FromMinutes(5))
                         {
-                            _logger.LogWarning("Tilaus {OrderId} on jo käsitelty {Minutes} minuuttia sitten", 
+                            _logger.LogWarning("Order {OrderId} was already processed {Minutes} minutes ago", 
                                 order.OrderId, (DateTime.UtcNow - processedTime).TotalMinutes);
                             return;
                         }
                     }
 
                     var startTime = DateTime.UtcNow;
-                    _logger.LogInformation("Käsitellään tilausta: {OrderId}", order.OrderId);
+                    _logger.LogInformation("Processing order: {OrderId}", order.OrderId);
                     order.Status = OrderStatus.Processing;
 
                     try
@@ -100,11 +100,11 @@ public class OrderProcessor
                             }
                         }
 
-                        _logger.LogInformation("Tilaus käsitelty: {OrderId}", order.OrderId);
+                        _logger.LogInformation("Order processed: {OrderId}", order.OrderId);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Virhe tilauksen julkaisussa");
+                        _logger.LogError(ex, "Error publishing order");
                         await _publisher.PublishAsync("orders/error", $"Error processing order {order.OrderId}: {ex.Message}");
                         _metrics.IncrementFailedOrders();
                         throw;
@@ -112,18 +112,18 @@ public class OrderProcessor
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Virhe tilauksen käsittelyssä");
+                    _logger.LogError(ex, "Error processing order");
                     await _publisher.PublishAsync("orders/error", $"Error processing order: {ex.Message}");
                     _metrics.IncrementFailedOrders();
                 }
             });
 
-            _logger.LogInformation("Tilausten käsittely käynnistetty");
+            _logger.LogInformation("Order processing started");
         }
         catch (Exception ex)
         {
             _isProcessing = false;
-            _logger.LogError(ex, "Virhe tilausten käsittelyn käynnistyksessä");
+            _logger.LogError(ex, "Error starting order processing");
             throw;
         }
     }
@@ -140,11 +140,11 @@ public class OrderProcessor
             await _subscriber.DisconnectAsync();
             await _publisher.DisconnectAsync();
             _isProcessing = false;
-            _logger.LogInformation("Tilausten käsittely pysäytetty");
+            _logger.LogInformation("Order processing stopped");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Virhe tilausten käsittelyn pysäytyksessä");
+            _logger.LogError(ex, "Error stopping order processing");
             throw;
         }
     }

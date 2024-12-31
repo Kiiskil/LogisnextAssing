@@ -20,7 +20,7 @@ builder.ConfigureAppConfiguration((hostingContext, config) =>
 builder.ConfigureServices((hostContext, services) =>
 {
     var mqttSettings = hostContext.Configuration.GetSection("MqttSettings").Get<MqttSettings>() 
-        ?? throw new InvalidOperationException("MqttSettings puuttuu konfiguraatiosta");
+        ?? throw new InvalidOperationException("MqttSettings missing from configuration");
     services.AddSingleton(mqttSettings);
     
     services.AddSingleton<IMetricsService, PrometheusMetricsService>();
@@ -60,7 +60,7 @@ catch (OperationCanceledException)
 catch (Exception ex)
 {
     var logger = host.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "Virhe tilausten käsittelyssä");
+    logger.LogError(ex, "Error processing orders");
     return 1;
 }
 finally

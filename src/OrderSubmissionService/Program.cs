@@ -39,7 +39,7 @@ try
 {
     if (args.Length != 3 || args[0] != "order")
     {
-        Console.WriteLine("Käyttö: dotnet run -- order \"[Asiakkaan nimi]\" \"[Tuotteen nimi]\"");
+        Console.WriteLine("Usage: dotnet run -- order \"[Customer name]\" \"[Product name]\"");
         return 1;
     }
 
@@ -53,11 +53,11 @@ try
     await mqttService.ConnectAsync();
 
     var order = await orderService.CreateOrderAsync(customerName, productName);
-    logger.LogInformation("Tilaus luotu. Tilauksen ID: {OrderId}", order.OrderId);
+    logger.LogInformation("Order created. Order ID: {OrderId}", order.OrderId);
 
     // Julkaistaan tilaus
     await mqttService.PublishAsync("orders/new", JsonSerializer.Serialize(order));
-    logger.LogInformation("Tilaus {OrderId} lähetetty käsittelyyn", order.OrderId);
+    logger.LogInformation("Order {OrderId} sent for processing", order.OrderId);
 
     // Odotetaan valmistumista tai aikakatkaisua
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -65,11 +65,11 @@ try
     {
         // Odotetaan hetki, että tilaus ehtii käsittelyyn
         await Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
-        logger.LogInformation("Tilaus {OrderId} valmis", order.OrderId);
+        logger.LogInformation("Order {OrderId} completed", order.OrderId);
     }
     catch (OperationCanceledException)
     {
-        logger.LogError("Tilauksen {OrderId} käsittely aikakatkaistiin", order.OrderId);
+        logger.LogError("Order {OrderId} processing timed out", order.OrderId);
         return 1;
     }
     finally
@@ -82,7 +82,7 @@ try
 catch (Exception ex)
 {
     var logger = host.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "Virhe tilauksen käsittelyssä");
+    logger.LogError(ex, "Error processing order");
     return 1;
 }
 finally

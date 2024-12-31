@@ -1,16 +1,29 @@
 # Logisnext Assignment - Real-Time Order Processing System
 
+## Project Structure
+
+```
+/src
+  /OrderSubmissionService     # Service for submitting orders
+  /OrderProcessingService     # Service for processing orders
+  /OrderProcessingService.Tests
+/shared
+  /Common                    # Shared components and interfaces
+```
+
 ## Overview
 
-The system consists of two microservices:
+The system consists of two microservices and a shared library:
 - **OrderSubmissionService**: Receives orders and publishes them to MQTT queue
 - **OrderProcessingService**: Processes orders from MQTT queue
+- **Common**: Shared models, interfaces and services
 
 ### Technologies and Libraries
+- **.NET 8.0**: Core framework
 - **MQTTnet (v4.3.1)**: For MQTT communication
 - **Microsoft.Extensions.Logging**: For logging and diagnostics
 - **System.Text.Json**: For JSON serialization
-- **Polly**: For retry logic
+- **prometheus-net**: For metrics collection
 - **Microsoft.Extensions.DependencyInjection**: For dependency injection
 
 ### Message Format
@@ -20,8 +33,8 @@ Orders are transmitted in JSON format:
   "orderId": "string (GUID)",
   "customerName": "string",
   "productName": "string",
-  "timestamp": "string (ISO 8601)",
-  "status": "string (New/Processing/Processed)"
+  "createdAt": "string (ISO 8601)",
+  "status": "string (New/Processing/Processed/Failed)"
 }
 ```
 
@@ -152,9 +165,6 @@ Default settings:
     "BrokerAddress": "localhost",
     "BrokerPort": 1883,
     "ClientId": "order-processing-service",
-    "Username": "",
-    "Password": "",
-    "UseTls": false,
     "RetryPolicy": {
       "MaxRetries": 3,
       "DelaySeconds": 5
@@ -168,25 +178,13 @@ Metrics settings in `appsettings.json`:
 
 ```json
 {
-  "MetricsSettings": {
-    "Port": 9090,
-    "Path": "/metrics",
-    "Prefix": "order_processing",
-    "Tags": {
-      "environment": "production",
-      "service": "order-processing"
-    },
-    "EnableHealthCheck": true
+  "Metrics": {
+    "Port": 9090
   }
 }
 ```
 
-Key settings:
-- `Port`: Prometheus metrics endpoint port
-- `Path`: Metrics endpoint path
-- `Prefix`: Metrics prefix in Prometheus
-- `Tags`: Common tags for all metrics
-- `EnableHealthCheck`: Enable health check endpoint
+The system uses prometheus-net for exposing metrics at the configured port.
 
 ### Mosquitto Configuration
 Mosquitto broker configuration file location:

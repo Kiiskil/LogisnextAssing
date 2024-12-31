@@ -21,10 +21,10 @@ public class OrderService : IOrderService
     public async Task<Order> CreateOrderAsync(string customerName, string productName)
     {
         if (string.IsNullOrWhiteSpace(customerName))
-            throw new ArgumentException("Asiakkaan nimi ei voi olla tyhjä", nameof(customerName));
+            throw new ArgumentException("Customer name cannot be empty", nameof(customerName));
 
         if (string.IsNullOrWhiteSpace(productName))
-            throw new ArgumentException("Tuotteen nimi ei voi olla tyhjä", nameof(productName));
+            throw new ArgumentException("Product name cannot be empty", nameof(productName));
 
         var order = new Order
         {
@@ -39,12 +39,12 @@ public class OrderService : IOrderService
         {
             await _mqttPublisher.PublishAsync("orders/new", JsonSerializer.Serialize(order));
             _metricsService.IncrementOrdersCreated();
-            _logger.LogInformation("Tilaus {OrderId} luotu ja lähetetty käsittelyyn", order.OrderId);
+            _logger.LogInformation("Order {OrderId} created and sent for processing", order.OrderId);
             return order;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Virhe tilauksen {OrderId} luonnissa", order.OrderId);
+            _logger.LogError(ex, "Error creating order {OrderId}", order.OrderId);
             throw;
         }
     }

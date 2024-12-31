@@ -166,9 +166,7 @@ public class MqttSubscriberService : IMqttSubscriberService
                     optionsBuilder.WithTls(new MqttClientOptionsBuilderTlsParameters
                     {
                         UseTls = true,
-                        AllowUntrustedCertificates = true,
-                        IgnoreCertificateChainErrors = true,
-                        IgnoreCertificateRevocationErrors = true
+                        CertificateValidationHandler = _ => true
                     });
                 }
 

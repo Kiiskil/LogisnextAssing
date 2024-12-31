@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OrderSubmissionService.Services;
+using Prometheus;
 
 var builder = Host.CreateDefaultBuilder(args);
 
@@ -22,9 +23,14 @@ builder.ConfigureServices((hostContext, services) =>
         ?? throw new InvalidOperationException("MqttSettings puuttuu konfiguraatiosta");
     services.AddSingleton(mqttSettings);
     
-    services.AddSingleton<IMetricsService, DummyMetricsService>();
+    services.AddSingleton<IMetricsService, PrometheusMetricsService>();
     services.AddSingleton<IMqttPublisherService, MqttPublisherService>();
     services.AddSingleton<OrderService>();
+
+    var metricsPort = hostContext.Configuration.GetValue<int>("Metrics:Port");
+    var server = new MetricServer(port: metricsPort);
+    server.Start();
+    services.AddSingleton(server);
 });
 
 var host = builder.Build();

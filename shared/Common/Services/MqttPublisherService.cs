@@ -47,9 +47,7 @@ public class MqttPublisherService : IMqttPublisherService
             optionsBuilder.WithTls(new MqttClientOptionsBuilderTlsParameters
             {
                 UseTls = true,
-                AllowUntrustedCertificates = true,
-                IgnoreCertificateChainErrors = true,
-                IgnoreCertificateRevocationErrors = true
+                CertificateValidationHandler = _ => true
             });
         }
 

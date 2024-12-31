@@ -56,7 +56,7 @@ public class PrometheusMetricsService : IMetricsService, IHealthCheck
         _retryDelays.WithLabels(operation).Observe(delay.TotalSeconds);
     }
 
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -73,14 +73,14 @@ public class PrometheusMetricsService : IMetricsService, IHealthCheck
                 { "failure_rate", failureRate }
             };
 
-            return isHealthy 
+            return Task.FromResult(isHealthy 
                 ? HealthCheckResult.Healthy("Service is healthy", data)
-                : HealthCheckResult.Degraded("Service is degraded", null, data);
+                : HealthCheckResult.Degraded("Service is degraded", null, data));
         }
         catch (Exception ex)
         {
             _serviceHealth.Set(0);
-            return HealthCheckResult.Unhealthy("Health check failed", ex);
+            return Task.FromResult(HealthCheckResult.Unhealthy("Health check failed", ex));
         }
     }
 } 

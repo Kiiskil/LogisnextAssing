@@ -11,13 +11,15 @@ public class OrderServiceTests
 {
     private readonly Mock<IMqttPublisherService> _publisherMock;
     private readonly Mock<ILogger<OrderService>> _loggerMock;
+    private readonly Mock<IMetricsService> _metricsMock;
     private readonly OrderService _orderService;
 
     public OrderServiceTests()
     {
         _publisherMock = new Mock<IMqttPublisherService>();
         _loggerMock = new Mock<ILogger<OrderService>>();
-        _orderService = new OrderService(_publisherMock.Object, _loggerMock.Object);
+        _metricsMock = new Mock<IMetricsService>();
+        _orderService = new OrderService(_publisherMock.Object, _loggerMock.Object, _metricsMock.Object);
     }
 
     [Fact]
@@ -41,6 +43,8 @@ public class OrderServiceTests
             It.IsAny<string>(),
             It.Is<string>(msg => msg.Contains(result.OrderId))), 
             Times.Once);
+
+        _metricsMock.Verify(x => x.IncrementOrdersCreated(), Times.Once);
     }
 
     [Theory]
@@ -58,6 +62,8 @@ public class OrderServiceTests
             It.IsAny<string>(), 
             It.IsAny<string>()), 
             Times.Never);
+
+        _metricsMock.Verify(x => x.IncrementOrdersCreated(), Times.Never);
     }
 
     [Fact]
@@ -71,5 +77,7 @@ public class OrderServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(() => 
             _orderService.CreateOrderAsync("Asiakas", "Tuote"));
+
+        _metricsMock.Verify(x => x.IncrementOrdersCreated(), Times.Never);
     }
 } 

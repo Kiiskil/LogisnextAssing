@@ -6,6 +6,7 @@ public class Order
     public string CustomerName { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; }
+    public DateTime CreatedAt { get; set; }
     public OrderStatus Status { get; set; }
 }
 

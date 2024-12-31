@@ -5,7 +5,6 @@ using MQTTnet;
 using MQTTnet.Client;
 using Polly;
 using Polly.Retry;
-using System.Threading;
 
 namespace OrderProcessingService.Services;
 
@@ -17,14 +16,16 @@ public class MqttSubscriberService : IMqttSubscriberService
     private IMqttClient? _client;
     private readonly MqttFactory _factory;
     private readonly AsyncRetryPolicy _retryPolicy;
-    private Action<string>? _messageHandler;
     private bool _isConnected;
     private MqttClientOptions? _options;
-    private string? _currentTopic;
     private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
     private bool _isSubscribed;
     private readonly HashSet<string> _processedMessageIds = new();
     private readonly SemaphoreSlim _messageLock = new SemaphoreSlim(1, 1);
+    private Action<string>? _messageHandler;
+    private string? _currentTopic;
+
+    public event Func<string, string, Task>? MessageReceived;
 
     public MqttSubscriberService(
         ILogger<MqttSubscriberService> logger, 
@@ -82,11 +83,11 @@ public class MqttSubscriberService : IMqttSubscriberService
                     }
 
                     _logger.LogInformation("Yhteys muodostettu uudelleen");
-                    
+
                     // Tilataan aihe uudelleen jos se on asetettu
-                    if (!string.IsNullOrEmpty(_currentTopic) && _messageHandler != null)
+                    if (!string.IsNullOrEmpty(_currentTopic))
                     {
-                        await SubscribeToTopicAsync(_currentTopic, _messageHandler);
+                        await SubscribeToTopicAsync(_currentTopic);
                     }
                 }
             }
@@ -101,23 +102,6 @@ public class MqttSubscriberService : IMqttSubscriberService
         }
     }
 
-    private async Task SubscribeToTopicAsync(string topic, Action<string> messageHandler)
-    {
-        if (_isSubscribed)
-        {
-            _logger.LogInformation("Aihe {Topic} on jo tilattu", topic);
-            return;
-        }
-
-        var subscribeOptions = _factory.CreateSubscribeOptionsBuilder()
-            .WithTopicFilter(topic, MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce)
-            .Build();
-
-        await _client!.SubscribeAsync(subscribeOptions);
-        _isSubscribed = true;
-        _logger.LogInformation("Tilattu aihe: {Topic}", topic);
-    }
-
     private async Task HandleMessageAsync(MqttApplicationMessageReceivedEventArgs e)
     {
         await _messageLock.WaitAsync();
@@ -130,21 +114,29 @@ public class MqttSubscriberService : IMqttSubscriberService
                 return;
             }
 
-            if (_messageHandler != null)
-            {
-                var startTime = DateTime.UtcNow;
-                var message = System.Text.Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment);
-                _messageHandler(message);
-                var duration = DateTime.UtcNow - startTime;
-                _metrics.RecordProcessingTime(e.ApplicationMessage.Topic, duration);
-                _metrics.IncrementProcessedOrders();
-                _processedMessageIds.Add(messageId);
+            var message = System.Text.Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment);
+            var topic = e.ApplicationMessage.Topic;
 
-                // Siivotaan vanhat viestit (pidetään vain viimeiset 1000)
-                if (_processedMessageIds.Count > 1000)
-                {
-                    _processedMessageIds.Clear();
-                }
+            var startTime = DateTime.UtcNow;
+
+            // Kutsutaan vanhaa messageHandler-delegaattia
+            _messageHandler?.Invoke(message);
+
+            // Kutsutaan uutta MessageReceived-tapahtumaa
+            if (MessageReceived != null)
+            {
+                await MessageReceived.Invoke(topic, message);
+            }
+
+            var duration = DateTime.UtcNow - startTime;
+            _metrics.RecordProcessingTime(topic, duration);
+            _metrics.IncrementProcessedOrders();
+            _processedMessageIds.Add(messageId);
+
+            // Siivotaan vanhat viestit (pidetään vain viimeiset 1000)
+            if (_processedMessageIds.Count > 1000)
+            {
+                _processedMessageIds.Clear();
             }
         }
         finally
@@ -170,7 +162,13 @@ public class MqttSubscriberService : IMqttSubscriberService
 
                 if (_settings.UseTls)
                 {
-                    optionsBuilder.WithTlsOptions(o => { });
+                    optionsBuilder.WithTls(new MqttClientOptionsBuilderTlsParameters
+                    {
+                        UseTls = true,
+                        AllowUntrustedCertificates = true,
+                        IgnoreCertificateChainErrors = true,
+                        IgnoreCertificateRevocationErrors = true
+                    });
                 }
 
                 _options = optionsBuilder.Build();
@@ -212,7 +210,25 @@ public class MqttSubscriberService : IMqttSubscriberService
         });
     }
 
-    public async Task SubscribeAsync(string topic, Action<string> messageHandler)
+    private async Task SubscribeToTopicAsync(string topic)
+    {
+        if (_isSubscribed)
+        {
+            _logger.LogInformation("Aihe {Topic} on jo tilattu", topic);
+            return;
+        }
+
+        var subscribeOptions = _factory.CreateSubscribeOptionsBuilder()
+            .WithTopicFilter(topic, MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce)
+            .Build();
+
+        await _client!.SubscribeAsync(subscribeOptions);
+        _isSubscribed = true;
+        _currentTopic = topic;
+        _logger.LogInformation("Tilattu aihe: {Topic}", topic);
+    }
+
+    public async Task SubscribeAsync(string topic)
     {
         await _retryPolicy.ExecuteAsync(async () =>
         {
@@ -221,7 +237,6 @@ public class MqttSubscriberService : IMqttSubscriberService
             {
                 if (_client == null || !_isConnected)
                 {
-                    // Jos yhteys on katkennut, yritetään muodostaa se uudelleen
                     await ConnectAsync();
                 }
 
@@ -230,17 +245,7 @@ public class MqttSubscriberService : IMqttSubscriberService
                     throw new InvalidOperationException("MQTT-asiakasta ei voitu luoda");
                 }
 
-                try
-                {
-                    _messageHandler = messageHandler;
-                    _currentTopic = topic;
-                    await SubscribeToTopicAsync(topic, messageHandler);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Virhe aiheen tilaamisessa: {Topic}", topic);
-                    throw;
-                }
+                await SubscribeToTopicAsync(topic);
             }
             finally
             {
@@ -249,22 +254,36 @@ public class MqttSubscriberService : IMqttSubscriberService
         });
     }
 
+    public async Task SubscribeAsync(string topic, Action<string> messageHandler)
+    {
+        _messageHandler = messageHandler;
+        await SubscribeAsync(topic);
+    }
+
+    public async Task UnsubscribeAsync(string topic)
+    {
+        if (_client == null || !_isConnected)
+        {
+            return;
+        }
+
+        await _client.UnsubscribeAsync(topic);
+        _isSubscribed = false;
+        _currentTopic = null;
+        _messageHandler = null;
+        _logger.LogInformation("Tilaus peruttu aiheesta: {Topic}", topic);
+    }
+
     public async Task DisconnectAsync()
     {
-        if (_client != null && _isConnected)
+        if (_client != null && _client.IsConnected)
         {
-            try
-            {
-                await _client.DisconnectAsync();
-                _isConnected = false;
-                _isSubscribed = false;
-                _logger.LogInformation("Yhteys MQTT-brokeriin katkaistu");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Virhe MQTT-yhteyden katkaisussa");
-                throw;
-            }
+            await _client.DisconnectAsync();
+            _isConnected = false;
+            _isSubscribed = false;
+            _currentTopic = null;
+            _messageHandler = null;
+            _logger.LogInformation("Yhteys MQTT-brokeriin katkaistu");
         }
     }
 } 

@@ -6,4 +6,5 @@ public interface IMetricsService
     void IncrementProcessedOrders();
     void IncrementFailedOrders();
     void RecordQueueLength(int length);
+    void IncrementOrdersCreated();
 } 

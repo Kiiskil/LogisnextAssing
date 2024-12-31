@@ -8,4 +8,5 @@ public class MqttSettings
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public bool UseTls { get; set; } = false;
+    public RetryPolicy RetryPolicy { get; set; } = new RetryPolicy();
 } 

@@ -24,8 +24,8 @@ builder.ConfigureServices((hostContext, services) =>
         ?? throw new InvalidOperationException("MqttSettings puuttuu konfiguraatiosta");
     services.AddSingleton(mqttSettings);
     
-    services.AddSingleton<IMetricsService, PrometheusMetricsService>();
-    services.AddSingleton<IMqttPublisherService, MqttPublisherService>();
+    services.AddSingleton<Common.Services.IMetricsService, Common.Services.PrometheusMetricsService>();
+    services.AddSingleton<Common.Services.IMqttPublisherService, Common.Services.MqttPublisherService>();
     services.AddSingleton<OrderService>();
     
     var metricsPort = hostContext.Configuration.GetValue<int>("Metrics:Port");
@@ -47,7 +47,7 @@ try
     var productName = args[2];
 
     var orderService = host.Services.GetRequiredService<OrderService>();
-    var mqttService = host.Services.GetRequiredService<IMqttPublisherService>();
+    var mqttService = host.Services.GetRequiredService<Common.Services.IMqttPublisherService>();
     var logger = host.Services.GetRequiredService<ILogger<Program>>();
 
     await mqttService.ConnectAsync();

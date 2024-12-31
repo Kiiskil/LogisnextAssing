@@ -44,27 +44,63 @@ Orders are transmitted in JSON format:
 - .NET 8.0 SDK
 - Visual Studio 2022 or Visual Studio Code
 - Git
-- Docker (recommended for production use)
+- Docker Desktop
 
-### Production Environment
-- .NET 8.0 Runtime
-- Mosquitto MQTT Broker
+### Infrastructure (Handled by Docker)
+- MQTT Broker (Mosquitto)
+- Prometheus (Metrics)
+- Grafana (Dashboards)
 
 ## Installation
 
-### 1. Development Environment Setup
+### Quick Start with Installation Script (Recommended)
+
+The project includes an automated installation script that handles all setup and startup:
+
+1. **Prerequisites**:
+   - .NET 8.0 SDK
+   - Docker Desktop
+   - Administrator privileges (required for metrics collection)
+
+2. **Run the Installation Script**:
+   ```powershell
+   .\install.ps1
+   ```
+
+   The script will:
+   - Verify .NET SDK and Docker installations
+   - Build .NET projects
+   - Start required Docker containers:
+     * MQTT Broker (Mosquitto) on port 1883
+     * Prometheus (Metrics) on port 9090
+     * Grafana (Dashboards) on port 3000
+   - Launch the application services in separate windows
+
+   > **Note**: The script requires administrator privileges and will automatically request elevation if needed.
+   > No need to install MQTT broker separately - it's included in Docker containers!
+
+3. **After Installation**:
+   - Wait for both services to initialize
+   - Order Processing Service will show "Connected to MQTT broker"
+   - Order Submission Service will be ready for commands
+   - Submit test orders using: `dotnet run order "Test Customer" "Product 123"`
+
+4. **Monitor the System**:
+   - Console output of both services
+   - Metrics: http://localhost:9090 (Prometheus)
+   - Dashboards: http://localhost:3000 (Grafana)
+
+### Manual Installation (Alternative)
+
+If you prefer manual installation:
 
 1. Install .NET 8.0 SDK:
    - Download and install: https://dotnet.microsoft.com/download/dotnet/8.0
    - Verify installation: `dotnet --version`
 
-2. Install Mosquitto MQTT Broker:
-   - Download package: https://mosquitto.org/download/
-   - Windows: Download and install latest Windows installer
-   - After installation:
-     - Mosquitto service should start automatically
-     - Check service status in Windows services (services.msc)
-     - Ensure port 1883 is open and available
+2. Install Docker Desktop:
+   - Download and install: https://www.docker.com/products/docker-desktop
+   - Verify installation: `docker --version`
 
 3. Clone repository:
    ```bash
@@ -72,93 +108,25 @@ Orders are transmitted in JSON format:
    cd LogisnextAssing
    ```
 
-### 2. Development Version Launch
-
-1. Start OrderProcessingService:
+4. Start the services manually (requires administrator privileges):
    ```bash
+   # Terminal 1: Start Order Processing Service
    cd src/OrderProcessingService
    dotnet run
-   ```
 
-2. Open new terminal and test OrderSubmissionService:
-   ```bash
+   # Terminal 2: Start Order Submission Service
    cd src/OrderSubmissionService
-   dotnet run order "Test Customer" "Product 123"
+   dotnet run
    ```
-
-### 3. Production Version Publishing
-
-1. Publish OrderProcessingService:
-   ```bash
-   cd src/OrderProcessingService
-   # Windows x64 publish
-   dotnet publish -c Release -r win-x64 --self-contained true
-   # or Linux x64 publish
-   dotnet publish -c Release -r linux-x64 --self-contained true
-   ```
-
-2. Publish OrderSubmissionService:
-   ```bash
-   cd src/OrderSubmissionService
-   # Windows x64 publish
-   dotnet publish -c Release -r win-x64 --self-contained true
-   # or Linux x64 publish
-   dotnet publish -c Release -r linux-x64 --self-contained true
-   ```
-
-Published versions can be found in:
-- Windows: `bin/Release/net8.0/win-x64/publish/`
-- Linux: `bin/Release/net8.0/linux-x64/publish/`
-
-### 4. Production Version Launch and Usage
-
-1. Copy published files to target environment:
-   - Copy entire publish directory contents
-   - Ensure `appsettings.json` is included
-   - Maintain directory structure
-
-2. Start OrderProcessingService:
-   ```bash
-   # Windows
-   cd OrderProcessingService/bin/Release/net8.0/win-x64/publish
-   ./OrderProcessingService.exe
-   # or Linux
-   cd OrderProcessingService/bin/Release/net8.0/linux-x64/publish
-   ./OrderProcessingService
-   ```
-
-3. Submit order using OrderSubmissionService:
-   ```bash
-   # Windows syntax
-   cd OrderSubmissionService/bin/Release/net8.0/win-x64/publish
-   OrderSubmissionService.exe order "<customer name>" "<product name>"
-   
-   # Linux syntax
-   cd OrderSubmissionService/bin/Release/net8.0/linux-x64/publish
-   ./OrderSubmissionService order "<customer name>" "<product name>"
-   
-   # Example:
-   OrderSubmissionService.exe order "John Smith" "Product ABC"
-   ```
-
-4. Check service status:
-   - View console log messages
-   - Check metrics at http://localhost:9090/metrics
-   - Monitor Grafana dashboards at http://localhost:3000
-
-Important notes:
-- Ensure MQTT broker is running and accessible
-- Check `appsettings.json` settings for target environment
-- Firewall must allow configured ports (default 1883 for MQTT)
 
 ## Configuration
 
 ### MQTT Settings
-MQTT settings are located in `appsettings.json` files:
+MQTT settings are located in `appsettings.json` files and are preconfigured to work with the Docker-based MQTT broker:
 - `src/OrderProcessingService/appsettings.json`
 - `src/OrderSubmissionService/appsettings.json`
 
-Default settings:
+Default settings (no changes needed with installation script):
 ```json
 {
   "MqttSettings": {
@@ -185,19 +153,6 @@ Metrics settings in `appsettings.json`:
 ```
 
 The system uses prometheus-net for exposing metrics at the configured port.
-
-### Mosquitto Configuration
-Mosquitto broker configuration file location:
-- Windows: `C:\Program Files\mosquitto\mosquitto.conf`
-
-Key settings:
-```conf
-max_keepalive 60
-persistent_client_expiration 1h
-max_inflight_messages 100
-allow_anonymous true
-listener 1883
-```
 
 ## Monitoring and Metrics
 

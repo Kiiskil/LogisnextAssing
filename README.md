@@ -1,20 +1,20 @@
 # Logisnext Assignment - Real-Time Order Processing System
 
-## Yleiskuvaus
+## Overview
 
-Järjestelmä koostuu kahdesta mikropalvelusta:
-- **OrderSubmissionService**: Vastaanottaa tilauksia ja julkaisee ne MQTT-jonoon
-- **OrderProcessingService**: Käsittelee tilauksia MQTT-jonosta
+The system consists of two microservices:
+- **OrderSubmissionService**: Receives orders and publishes them to MQTT queue
+- **OrderProcessingService**: Processes orders from MQTT queue
 
-### Käytetyt teknologiat ja kirjastot
-- **MQTTnet (v4.3.1)**: MQTT-kommunikaatioon
-- **Microsoft.Extensions.Logging**: Lokitukseen ja diagnostiikkaan
-- **System.Text.Json**: JSON-serialisointiin
-- **Polly**: Uudelleenyrityslogiikkaan
-- **Microsoft.Extensions.DependencyInjection**: Riippuvuuksien injektointiin
+### Technologies and Libraries
+- **MQTTnet (v4.3.1)**: For MQTT communication
+- **Microsoft.Extensions.Logging**: For logging and diagnostics
+- **System.Text.Json**: For JSON serialization
+- **Polly**: For retry logic
+- **Microsoft.Extensions.DependencyInjection**: For dependency injection
 
-### Viestiformaatti
-Tilaukset välitetään JSON-muodossa:
+### Message Format
+Orders are transmitted in JSON format:
 ```json
 {
   "orderId": "string (GUID)",
@@ -25,127 +25,127 @@ Tilaukset välitetään JSON-muodossa:
 }
 ```
 
-## Vaatimukset
+## Requirements
 
-### Kehitysympäristö
+### Development Environment
 - .NET 8.0 SDK
-- Visual Studio 2022 tai Visual Studio Code
+- Visual Studio 2022 or Visual Studio Code
 - Git
-- Docker (suositeltu tuotantokäyttöön)
+- Docker (recommended for production use)
 
-### Tuotantoympäristö
+### Production Environment
 - .NET 8.0 Runtime
 - Mosquitto MQTT Broker
 
-## Asennus
+## Installation
 
-### 1. Kehitysympäristön asennus
+### 1. Development Environment Setup
 
-1. Asenna .NET 8.0 SDK:
-   - Lataa ja asenna: https://dotnet.microsoft.com/download/dotnet/8.0
-   - Varmista asennus: `dotnet --version`
+1. Install .NET 8.0 SDK:
+   - Download and install: https://dotnet.microsoft.com/download/dotnet/8.0
+   - Verify installation: `dotnet --version`
 
-2. Asenna Mosquitto MQTT Broker:
-   - Lataa asennuspaketti: https://mosquitto.org/download/
-   - Windows: Lataa ja asenna uusin versio Windows-asennuspaketista
-   - Asennuksen jälkeen:
-     - Mosquitto-palvelun pitäisi käynnistyä automaattisesti
-     - Tarkista palvelun tila Windowsin palveluista (services.msc)
-     - Varmista että portti 1883 on auki ja käytettävissä
+2. Install Mosquitto MQTT Broker:
+   - Download package: https://mosquitto.org/download/
+   - Windows: Download and install latest Windows installer
+   - After installation:
+     - Mosquitto service should start automatically
+     - Check service status in Windows services (services.msc)
+     - Ensure port 1883 is open and available
 
-3. Kloonaa repositorio:
+3. Clone repository:
    ```bash
    git clone [repository-url]
    cd LogisnextAssing
    ```
 
-### 2. Kehitysversion käynnistys
+### 2. Development Version Launch
 
-1. Käynnistä OrderProcessingService:
+1. Start OrderProcessingService:
    ```bash
    cd src/OrderProcessingService
    dotnet run
    ```
 
-2. Avaa uusi terminaali ja testaa OrderSubmissionService:
+2. Open new terminal and test OrderSubmissionService:
    ```bash
    cd src/OrderSubmissionService
-   dotnet run order "Testi Asiakas" "Tuote 123"
+   dotnet run order "Test Customer" "Product 123"
    ```
 
-### 3. Tuotantoversion julkaisu
+### 3. Production Version Publishing
 
-1. Julkaise OrderProcessingService:
+1. Publish OrderProcessingService:
    ```bash
    cd src/OrderProcessingService
-   # Windows x64 julkaisu
+   # Windows x64 publish
    dotnet publish -c Release -r win-x64 --self-contained true
-   # tai Linux x64 julkaisu
+   # or Linux x64 publish
    dotnet publish -c Release -r linux-x64 --self-contained true
    ```
 
-2. Julkaise OrderSubmissionService:
+2. Publish OrderSubmissionService:
    ```bash
    cd src/OrderSubmissionService
-   # Windows x64 julkaisu
+   # Windows x64 publish
    dotnet publish -c Release -r win-x64 --self-contained true
-   # tai Linux x64 julkaisu
+   # or Linux x64 publish
    dotnet publish -c Release -r linux-x64 --self-contained true
    ```
 
-Julkaistut versiot löytyvät seuraavista hakemistoista:
+Published versions can be found in:
 - Windows: `bin/Release/net8.0/win-x64/publish/`
 - Linux: `bin/Release/net8.0/linux-x64/publish/`
 
-### 4. Tuotantoversion käynnistys ja käyttö
+### 4. Production Version Launch and Usage
 
-1. Kopioi julkaistut tiedostot kohdeympäristöön:
-   - Kopioi koko publish-hakemiston sisältö
-   - Varmista että `appsettings.json` on mukana
-   - Säilytä hakemistorakenne
+1. Copy published files to target environment:
+   - Copy entire publish directory contents
+   - Ensure `appsettings.json` is included
+   - Maintain directory structure
 
-2. Käynnistä OrderProcessingService:
+2. Start OrderProcessingService:
    ```bash
    # Windows
    cd OrderProcessingService/bin/Release/net8.0/win-x64/publish
    ./OrderProcessingService.exe
-   # tai Linux
+   # or Linux
    cd OrderProcessingService/bin/Release/net8.0/linux-x64/publish
    ./OrderProcessingService
    ```
 
-3. Lähetä tilaus OrderSubmissionService:llä:
+3. Submit order using OrderSubmissionService:
    ```bash
-   # Windows syntaksi
+   # Windows syntax
    cd OrderSubmissionService/bin/Release/net8.0/win-x64/publish
-   OrderSubmissionService.exe order "<asiakkaan nimi>" "<tuotteen nimi>"
+   OrderSubmissionService.exe order "<customer name>" "<product name>"
    
-   # Linux syntaksi
+   # Linux syntax
    cd OrderSubmissionService/bin/Release/net8.0/linux-x64/publish
-   ./OrderSubmissionService order "<asiakkaan nimi>" "<tuotteen nimi>"
+   ./OrderSubmissionService order "<customer name>" "<product name>"
    
-   # Esimerkki:
-   OrderSubmissionService.exe order "Matti Meikäläinen" "Tuote ABC"
+   # Example:
+   OrderSubmissionService.exe order "John Smith" "Product ABC"
    ```
 
-4. Tarkista palvelun tila:
-   - Katso konsolista tulostuvia lokiviestejä
-   - Tarkista metriikat osoitteesta http://localhost:9090/metrics
-   - Seuraa Grafana-dashboardeja osoitteessa http://localhost:3000
+4. Check service status:
+   - View console log messages
+   - Check metrics at http://localhost:9090/metrics
+   - Monitor Grafana dashboards at http://localhost:3000
 
-Huomioitavaa:
-- Varmista että MQTT-broker on käynnissä ja saavutettavissa
-- Tarkista `appsettings.json` asetukset kohdeympäristöä varten
-- Palomuurin pitää sallia määritetyt portit (oletuksena 1883 MQTT:lle)
+Important notes:
+- Ensure MQTT broker is running and accessible
+- Check `appsettings.json` settings for target environment
+- Firewall must allow configured ports (default 1883 for MQTT)
 
-## Konfigurointi
+## Configuration
 
-### MQTT-asetukset
-Palveluiden MQTT-asetukset löytyvät `appsettings.json`-tiedostoista:
+### MQTT Settings
+MQTT settings are located in `appsettings.json` files:
 - `src/OrderProcessingService/appsettings.json`
 - `src/OrderSubmissionService/appsettings.json`
 
-Oletusasetukset:
+Default settings:
 ```json
 {
   "MqttSettings": {
@@ -163,8 +163,8 @@ Oletusasetukset:
 }
 ```
 
-### Metriikoiden konfigurointi
-Metriikoiden asetukset löytyvät `appsettings.json`-tiedostoista:
+### Metrics Configuration
+Metrics settings in `appsettings.json`:
 
 ```json
 {
@@ -181,18 +181,18 @@ Metriikoiden asetukset löytyvät `appsettings.json`-tiedostoista:
 }
 ```
 
-Tärkeimmät asetukset:
-- `Port`: Prometheus metrics endpoint portti
-- `Path`: Metrics endpointin polku
-- `Prefix`: Metriikkojen etuliite Prometheuksessa
-- `Tags`: Yleiset tagit kaikille metriikoille
-- `EnableHealthCheck`: Health check -endpointin käyttöönotto
+Key settings:
+- `Port`: Prometheus metrics endpoint port
+- `Path`: Metrics endpoint path
+- `Prefix`: Metrics prefix in Prometheus
+- `Tags`: Common tags for all metrics
+- `EnableHealthCheck`: Enable health check endpoint
 
-### Mosquitto-konfiguraatio
-Mosquitto-brokerin konfiguraatio löytyy tiedostosta:
+### Mosquitto Configuration
+Mosquitto broker configuration file location:
 - Windows: `C:\Program Files\mosquitto\mosquitto.conf`
 
-Tärkeimmät asetukset:
+Key settings:
 ```conf
 max_keepalive 60
 persistent_client_expiration 1h
@@ -201,13 +201,13 @@ allow_anonymous true
 listener 1883
 ```
 
-## Monitorointi ja metriikat
+## Monitoring and Metrics
 
-### Prometheus ja Grafana
+### Prometheus and Grafana
 
-Järjestelmä käyttää Prometheusta metriikoiden keräämiseen ja Grafanaa niiden visualisointiin:
+The system uses Prometheus for metrics collection and Grafana for visualization:
 
-1. Prometheus-asetukset:
+1. Prometheus settings:
    ```yaml
    global:
      scrape_interval: 15s
@@ -222,205 +222,108 @@ Järjestelmä käyttää Prometheusta metriikoiden keräämiseen ja Grafanaa nii
          - targets: ['localhost:9091']
    ```
 
-2. Grafana-dashboardit:
-   - Tilausten käsittelyajat
-   - Onnistuneet/epäonnistuneet tilaukset
-   - Jonon pituus
-   - Palveluiden tila
+2. Grafana dashboards:
+   - Order processing times
+   - Successful/failed orders
+   - Queue length
+   - Service status
 
-### Kerättävät metriikat
+### Collected Metrics
 
 1. OrderProcessingService:
-   - Käsiteltyjen tilausten määrä
-   - Epäonnistuneiden tilausten määrä
-   - Tilausten käsittelyaika (histogrammi)
-   - Duplikaattitilausten määrä
-   - MQTT-yhteyden tila
+   - Number of processed orders
+   - Number of failed orders
+   - Order processing time (histogram)
+   - Number of duplicate orders
+   - MQTT connection status
 
 2. OrderSubmissionService:
-   - Lähetettyjen tilausten määrä
-   - Epäonnistuneiden lähetysten määrä
-   - Lähetysaika (histogrammi)
-   - MQTT-yhteyden tila
+   - Number of submitted orders
+   - Number of failed submissions
+   - Submission time (histogram)
+   - MQTT connection status
 
-### Monitoroinnin käyttöönotto
+### Monitoring Setup
 
-1. Käynnistä Prometheus:
+1. Start Prometheus:
    ```bash
    docker-compose up -d prometheus
    ```
 
-2. Käynnistä Grafana:
+2. Start Grafana:
    ```bash
    docker-compose up -d grafana
    ```
 
-3. Avaa Grafana selaimessa:
+3. Open Grafana in browser:
    - URL: http://localhost:3000
-   - Oletustunnukset: admin/admin
+   - Default credentials: admin/admin
 
-4. Tuo valmiit dashboardit:
-   - Navigoi Dashboards > Import
-   - Lataa dashboard-määritykset kansiosta `grafana/dashboards/`
+4. Import ready-made dashboards:
+   - Navigate to Dashboards > Import
+   - Load dashboard definitions from `grafana/dashboards/`
 
-### Hälytysten konfigurointi
+### Alert Configuration
 
-Grafanassa voidaan määrittää hälytykset esimerkiksi:
-- Korkea virhemäärä (> 5% tilauksista)
-- Pitkä käsittelyaika (> 5s)
-- MQTT-yhteyden katkeaminen
-- Palvelun kaatuminen
+Grafana alerts can be configured for:
+- High error rate (> 5% of orders)
+- Long processing time (> 5s)
+- MQTT connection loss
+- Service failure
 
-## Vianetsintä
+## Troubleshooting
 
-### Yleiset ongelmat
+### Common Issues
 
-1. MQTT-yhteysongelmat:
-   - Varmista että Mosquitto-palvelu on käynnissä
-   - Tarkista että portti 1883 on auki
-   - Tarkista palomuuriasetukset
+1. MQTT connection problems:
+   - Verify Mosquitto service is running
+   - Check port 1883 is open
+   - Check firewall settings
 
-2. Julkaisuvirheet:
-   - Varmista että sinulla on kirjoitusoikeudet julkaisukansioon
-   - Sulje kaikki ajossa olevat instanssit ennen uutta julkaisua
+2. Publishing errors:
+   - Ensure you have write permissions to publish directory
+   - Close all running instances before new publish
 
-3. Suoritusvirheet:
-   - Tarkista että .NET Runtime on asennettu
-   - Tarkista lokitiedostot virheilmoitusten varalta
+3. Runtime errors:
+   - Verify .NET Runtime is installed
+   - Check log files for error messages
 
-## Arkkitehtuuri
+## Testing
 
-### Komponenttidiagrammi
-```
-┌─────────────────┐     ┌──────────────┐     ┌──────────────────┐
-│     Order       │     │              │     │      Order       │
-│   Submission    │────▶│    MQTT      │────▶│    Processing    │
-│    Service      │     │    Broker    │     │     Service      │
-└─────────┬───────┘     │  (Mosquitto) │     └────────┬─────────┘
-          │             │              │              │
-          │             └──────────────┘              │
-          │                                          │
-          │             ┌──────────────┐             │
-          └────────────▶│  Prometheus  │◀────────────┘
-                       │              │
-                       └───────┬──────┘
-                              │
-                       ┌──────┴──────┐
-                       │   Grafana   │
-                       │             │
-                       └─────────────┘
-```
+### Running Tests
 
-### Prosessikuvaus
-1. OrderSubmissionService:
-   - Vastaanottaa tilaukset komentoriviparametreina
-   - Validoi tilaukset
-   - Julkaisee tilaukset MQTT-jonoon (topic: orders/new)
-   - Odottaa kunnes tilaus on julkaistu ja näyttää tilauksen ID:n
-   - Prosessointiaika: < 1 sekunti
-
-2. OrderProcessingService:
-   - Kuuntelee uusia tilauksia MQTT-jonosta
-   - Käsittelee tilaukset (2 sekunnin simuloitu viive per tilaus)
-   - Julkaisee käsitellyt tilaukset takaisin MQTT-jonoon (topic: orders/processed/{orderId})
-   - Estää duplikaattitilausten käsittelyn
-   - Prosessointiaika: 2 sekuntia per tilaus
-
-3. MQTT-broker (Mosquitto):
-   - Toimii viestinvälittäjänä palveluiden välillä
-   - Varmistaa viestien luotettavan toimituksen (QoS 1)
-   - Tukee QoS-tasoja 0-2
-
-### Skaalautuvuus ja vikasietoisuus
-Järjestelmä tukee useita rinnakkaisia instansseja:
-- OrderSubmissionService voi skaalautua horisontaalisesti, koska jokainen instanssi on tilaton
-- OrderProcessingService voi skaalautua horisontaalisesti:
-  - Duplikaattitilausten käsittely on estetty
-  - Jokainen instanssi saa uniikin client ID:n
-  - Tilaukset jaetaan automaattisesti vapaana oleville instansseille
-- MQTT-broker voidaan klusteroida korkean saatavuuden varmistamiseksi
-  - Tukee master-slave replikointia
-  - Tukee bridge-konfiguraatiota hajautettuun toimintaan
-
-## Testaus
-
-Järjestelmän testaus on toteutettu seuraavilla tasoilla:
-
-1. Yksikkötestit:
-   - Tilauksen validointi
-   - JSON-serialisointi
-   - Viestien muotoilu
-
-2. Integraatiotestit:
-   - MQTT-yhteyden muodostus
-   - Viestien julkaisu ja vastaanotto
-   - Retry-politiikan toiminta
-
-3. End-to-end testit:
-   - Tilauksen lähetys ja käsittely
-   - Virhetilanteiden käsittely
-
-Testit voi ajaa komennolla:
-```bash
-dotnet test
-``` 
-
-## Esimerkit
-
-### Komentorivin käyttö
-
-1. Tilauksen lähettäminen:
-```bash
-dotnet run -- order "CustomerName" "ProductName"
-```
-
-2. Tilauksen JSON-formaatti:
-```json
-{
-  "orderId": "550e8400-e29b-41d4-a716-446655440000",
-  "customerName": "CustomerName",
-  "productName": "ProductName",
-  "timestamp": "2024-01-01T12:00:00Z",
-  "status": "New"
-}
-```
-
-## Testaus
-
-### Testien ajaminen
-
-Testit voidaan ajaa seuraavilla komennoilla:
+Tests can be run using following commands:
 
 ```bash
-# Kaikki testit
+# All tests
 dotnet test
 
-# Yksikkötestit
+# Unit tests
 dotnet test --filter Category=Unit
 
-# Integraatiotestit
+# Integration tests
 dotnet test --filter Category=Integration
 ```
 
-### Testausstrategia
+### Testing Strategy
 
-1. Yksikkötestit:
-   - Tilauksen validointi
-   - JSON-serialisointi
-   - Viestien muotoilu
-   - Uudelleenyrityslogiikka
+1. Unit Tests:
+   - Order validation
+   - JSON serialization
+   - Message formatting
+   - Retry logic
 
-2. Integraatiotestit:
-   - MQTT-yhteyden muodostus
-   - Viestien julkaisu ja vastaanotto
-   - Metriikoiden keräys
+2. Integration Tests:
+   - MQTT connection establishment
+   - Message publishing and receiving
+   - Metrics collection
 
-3. End-to-end testit:
-   - Tilauksen lähetys ja käsittely
-   - Virhetilanteiden käsittely
-   - Suorituskykytestit
+3. End-to-end Tests:
+   - Order submission and processing
+   - Error handling
+   - Performance tests
 
-### Testiesimerkki
+### Test Example
 
 ```csharp
 [Fact]
@@ -444,35 +347,35 @@ public void ValidateOrder_WithValidData_ShouldPass()
 }
 ```
 
-## Skaalautuvuus
+## Scalability
 
-### Useamman instanssin ajaminen
+### Running Multiple Instances
 
-Palvelut on suunniteltu skaalautumaan horisontaalisesti:
+Services are designed to scale horizontally:
 
 1. OrderSubmissionService:
-   - Tilaton palvelu
-   - Voidaan ajaa useita rinnakkaisia instansseja
-   - Jokainen instanssi saa uniikin client ID:n
+   - Stateless service
+   - Can run multiple parallel instances
+   - Each instance gets unique client ID
 
 2. OrderProcessingService:
-   - Tukee useita rinnakkaisia instansseja
-   - Duplikaattitilausten käsittely estetty
-   - Tilaukset jaetaan automaattisesti vapaana oleville instansseille
+   - Supports multiple parallel instances
+   - Duplicate order handling prevented
+   - Orders automatically distributed to available instances
 
-Käynnistys eri porteilla:
+Launch on different ports:
 
 ```bash
-# OrderProcessingService instanssi 1
+# OrderProcessingService instance 1
 dotnet run --urls="http://localhost:5001"
 
-# OrderProcessingService instanssi 2
+# OrderProcessingService instance 2
 dotnet run --urls="http://localhost:5002"
 ```
 
-### Kuormantasaus
+### Load Balancing
 
-MQTT-broker (Mosquitto) hoitaa viestien jakamisen automaattisesti:
-- Viestit jaetaan round-robin periaatteella
-- Käsittelemättömät viestit säilyvät jonossa
-- Viestit toimitetaan vähintään kerran (QoS 1) 
+MQTT broker (Mosquitto) handles message distribution automatically:
+- Messages distributed using round-robin principle
+- Unprocessed messages remain in queue
+- Messages delivered at least once (QoS 1) 

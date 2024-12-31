@@ -1,109 +1,144 @@
-# Arkkitehtuuridokumentaatio
+# Architecture Documentation
 
-## Yleiskuvaus
+## Overview
 
-Järjestelmä koostuu kahdesta mikropalvelusta, jotka kommunikoivat keskenään MQTT-viestijonon välityksellä. Järjestelmä on suunniteltu skaalautuvaksi ja vikasietoiseksi.
+The system consists of two microservices that communicate via an MQTT message queue. The system is designed to be scalable and fault-tolerant.
 
-## Komponentit
+## Components
 
 ### OrderSubmissionService
 
-- Vastaanottaa tilaukset REST-rajapinnan kautta
-- Validoi tilaukset
-- Generoi yksilölliset tilaus-ID:t
-- Julkaisee tilaukset MQTT-jonoon
-- Kerää metriikat Prometheukseen
+- Receives orders through command line interface
+- Validates orders
+- Generates unique order IDs
+- Publishes orders to MQTT queue
+- Collects metrics to Prometheus
 
-Teknologiat:
+Technologies:
 - .NET 8.0
 - MQTTnet
 - Prometheus-net
-- Polly (uudelleenyritykset)
+- Polly (for retries)
 
 ### OrderProcessingService
 
-- Kuuntelee MQTT-jonoa
-- Käsittelee tilaukset
-- Päivittää tilausten tilan
-- Kerää metriikat Prometheukseen
+- Listens to MQTT queue
+- Processes orders
+- Updates order status
+- Collects metrics to Prometheus
 
-Teknologiat:
+Technologies:
 - .NET 8.0
 - MQTTnet
 - Prometheus-net
-- Polly (uudelleenyritykset)
+- Polly (for retries)
 
-### Infrastruktuuri
+### Infrastructure
 
 #### MQTT Broker (Eclipse Mosquitto)
 
-- Toimii viestijonona palveluiden välillä
-- Tukee QoS-tasoja (At least once)
-- Mahdollisuus TLS-salaukseen
-- Tukee pysyvää tallennusta
+- Acts as a message queue between services
+- Supports QoS levels (At least once)
+- Optional TLS encryption capability
+- Optional user authentication
+- Supports persistent storage
+
+Configuration for clustering:
+```conf
+# Master node configuration
+listener 1883
+connection_messages true
+allow_anonymous true
+
+# Slave node configuration
+connection master
+address master-node:1883
+topic # both 2
+```
 
 #### Prometheus
 
-- Kerää metriikat molemmista palveluista
-- Tukee hälytysten määrittelyä
-- Tarjoaa PromQL-kyselykielen
+- Collects metrics from both services
+- Supports alert configuration
+- Provides PromQL query language
 
 #### Grafana
 
-- Visualisoi Prometheuksen metriikat
-- Tukee dashboardien luontia
-- Mahdollisuus hälytysten konfigurointiin
+- Visualizes Prometheus metrics
+- Supports dashboard creation
+- Alert configuration capability
 
-## Tietoturva
+## Security
 
-### TLS-salaus
+### TLS Encryption (Optional)
 
-- MQTT-yhteydet voidaan salata TLS:llä
-- Tuki sertifikaattien validoinnille
-- Mahdollisuus käyttäjätunnistukseen
+- MQTT connections can be encrypted with TLS
+- Support for certificate validation
+- User authentication capability
+- Configuration in appsettings.json:
+```json
+{
+  "MqttSettings": {
+    "UseTls": true,
+    "CertificatePath": "/path/to/cert",
+    "Username": "user",
+    "Password": "pass"
+  }
+}
+```
 
-### Metriikat
+### Metrics
 
-- Prometheus-portit vain sisäverkossa
-- Basic Authentication Grafanassa
-- HTTPS-tuki Grafanalle
+- Prometheus ports only in internal network
+- Basic Authentication in Grafana
+- HTTPS support for Grafana
 
-## Skaalautuvuus
+## Scalability
 
-### Horisontaalinen skaalaus
+### Horizontal Scaling
 
-- OrderSubmissionService voidaan skaalata usealle instanssille
-- OrderProcessingService voidaan skaalata usealle instanssille
-- MQTT-broker tukee klusterointia
+- OrderSubmissionService can be scaled to multiple instances
+- OrderProcessingService can be scaled to multiple instances
+- MQTT broker supports clustering with master-slave configuration
 
-### Vikasietoisuus
+Example scaling configuration:
+```bash
+# Start multiple OrderProcessingService instances
+dotnet run --urls="http://localhost:5001"
+dotnet run --urls="http://localhost:5002"
 
-- Uudelleenyrityslogiikka Polly-kirjastolla
-- MQTT QoS-taso varmistaa viestien perillemenon
-- Prometheus-metriikat auttavat ongelmien havaitsemisessa
+# Each instance automatically gets unique client ID
+# Duplicate order handling is implemented in OrderProcessor
+```
 
-## Monitorointi
+### Fault Tolerance
 
-### Metriikat
+- Retry logic with Polly library
+- MQTT QoS level ensures message delivery
+- Prometheus metrics help detect issues
 
-- Käsiteltyjen tilausten määrä
-- Epäonnistuneiden tilausten määrä
-- Tilausten käsittelyaika
-- Jonon pituus
-- Uudelleenyritysten määrä
+## Monitoring
 
-### Lokitus
+### Metrics
 
-- Strukturoitu lokitus
-- Eri lokitustasot (Info, Warning, Error)
-- Mahdollisuus keskitettyyn lokienhallintaan
+- Number of processed orders
+- Number of failed orders
+- Order processing time
+- Queue length
+- Number of retries
 
-## Jatkokehitys
+### Logging
 
-1. Integraatiotestit Docker-pohjaisella MQTT-brokerilla
-2. End-to-end testit
-3. Metriikoiden visualisointi Grafanassa
-4. TLS-sertifikaattien käyttöönotto
-5. Uudelleenyrityslogiikan laajentaminen
-6. Keskitetty lokienhallinta
-7. Automaattinen skaalaus 
+- Structured logging
+- Different log levels (Info, Warning, Error)
+- Centralized log management capability
+
+## Future Development
+
+1. Integration tests with Docker-based MQTT broker
+2. End-to-end tests
+3. Metrics visualization in Grafana
+4. TLS certificate implementation
+5. Expansion of retry logic
+6. Centralized log management
+7. Automatic scaling 

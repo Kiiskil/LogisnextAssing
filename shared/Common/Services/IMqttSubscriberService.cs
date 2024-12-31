@@ -2,6 +2,7 @@ namespace Common.Services;
 
 public interface IMqttSubscriberService
 {
+    bool IsConnected { get; }
     Task ConnectAsync();
     Task DisconnectAsync();
     Task SubscribeAsync(string topic);

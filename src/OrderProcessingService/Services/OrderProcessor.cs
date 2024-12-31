@@ -34,13 +34,21 @@ public class OrderProcessor
             throw new InvalidOperationException("Tilausten käsittely on jo käynnissä");
         }
 
-        _isProcessing = true;
-
         try
         {
-            await _subscriber.ConnectAsync();
-            await _publisher.ConnectAsync();
+            // Muodostetaan MQTT-yhteydet vain jos niitä ei ole vielä muodostettu
+            if (!_subscriber.IsConnected)
+            {
+                await _subscriber.ConnectAsync();
+            }
+            if (!_publisher.IsConnected)
+            {
+                await _publisher.ConnectAsync();
+            }
+            
+            _isProcessing = true;
 
+            // Tilataan uudet tilaukset
             await _subscriber.SubscribeAsync("orders/new", async message =>
             {
                 try

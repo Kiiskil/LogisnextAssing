@@ -25,6 +25,8 @@ public class MqttSubscriberService : IMqttSubscriberService
     private Action<string>? _messageHandler;
     private string? _currentTopic;
 
+    public bool IsConnected => _isConnected;
+
     public event Func<string, string, Task>? MessageReceived;
 
     public MqttSubscriberService(

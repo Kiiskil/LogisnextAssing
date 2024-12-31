@@ -15,6 +15,8 @@ public class MqttPublisherService : IMqttPublisherService
     private readonly IMqttClient _mqttClient;
     private readonly AsyncRetryPolicy _retryPolicy;
 
+    public bool IsConnected => _mqttClient.IsConnected;
+
     public MqttPublisherService(MqttSettings settings, ILogger<MqttPublisherService> logger, IMetricsService metricsService)
     {
         _settings = settings;

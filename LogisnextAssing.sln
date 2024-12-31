@@ -1,8 +1,5 @@
-﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # 
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogisnextAssing", "LogisnextAssing\LogisnextAssing.csproj", "{5615892B-1B1C-43CE-A600-5DC1BD889DA5}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shared", "shared", "{E492569E-014D-434E-9EA2-189FC42C840B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "shared\Common\Common.csproj", "{48855281-8AF7-47C1-B9D0-D845836C5DF2}"
@@ -19,16 +16,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderSubmissionService.Test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderProcessingService.Tests", "tests\OrderProcessingService.Tests\OrderProcessingService.Tests.csproj", "{A3753599-28FB-45B6-92B4-D135C2ECB07C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EndToEndTests", "tests\EndToEndTests\EndToEndTests.csproj", "{B3753599-28FB-45B6-92B4-D135C2ECB07D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{5615892B-1B1C-43CE-A600-5DC1BD889DA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5615892B-1B1C-43CE-A600-5DC1BD889DA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5615892B-1B1C-43CE-A600-5DC1BD889DA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5615892B-1B1C-43CE-A600-5DC1BD889DA5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{48855281-8AF7-47C1-B9D0-D845836C5DF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{48855281-8AF7-47C1-B9D0-D845836C5DF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{48855281-8AF7-47C1-B9D0-D845836C5DF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -49,6 +44,10 @@ Global
 		{A3753599-28FB-45B6-92B4-D135C2ECB07C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A3753599-28FB-45B6-92B4-D135C2ECB07C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A3753599-28FB-45B6-92B4-D135C2ECB07C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3753599-28FB-45B6-92B4-D135C2ECB07D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3753599-28FB-45B6-92B4-D135C2ECB07D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3753599-28FB-45B6-92B4-D135C2ECB07D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3753599-28FB-45B6-92B4-D135C2ECB07D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{48855281-8AF7-47C1-B9D0-D845836C5DF2} = {E492569E-014D-434E-9EA2-189FC42C840B}
@@ -56,5 +55,6 @@ Global
 		{9DC248FC-5AEE-4211-A4D7-23298DA8A3E7} = {3BF4205F-A073-4A1E-978C-D76D18083AFF}
 		{22EA2420-DC2B-45B5-BB77-A9494F648F07} = {6133C3E3-52A3-40B8-91DA-CAD5C1B065EB}
 		{A3753599-28FB-45B6-92B4-D135C2ECB07C} = {6133C3E3-52A3-40B8-91DA-CAD5C1B065EB}
+		{B3753599-28FB-45B6-92B4-D135C2ECB07D} = {6133C3E3-52A3-40B8-91DA-CAD5C1B065EB}
 	EndGlobalSection
 EndGlobal

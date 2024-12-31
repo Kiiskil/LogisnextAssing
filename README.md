@@ -87,7 +87,10 @@ The project includes an automated installation script that handles all setup and
 
 4. **Monitor the System**:
    - Console output of both services
-   - Metrics: http://localhost:9090 (Prometheus)
+   - Metrics:
+     * OrderSubmissionService: http://localhost:9100/metrics
+     * OrderProcessingService: http://localhost:9101/metrics
+     * Prometheus: http://localhost:9090 (aggregated metrics)
    - Dashboards: http://localhost:3000 (Grafana)
 
 ### Manual Installation (Alternative)
@@ -142,17 +145,17 @@ Default settings (no changes needed with installation script):
 ```
 
 ### Metrics Configuration
-Metrics settings in `appsettings.json`:
+Metrics settings in `appsettings.json` for OrderProcessingService:
 
 ```json
 {
   "Metrics": {
-    "Port": 9090
+    "Port": 9101
   }
 }
 ```
 
-The system uses prometheus-net for exposing metrics at the configured port.
+The system uses prometheus-net for exposing metrics. All metrics (including order creation metrics) are collected and exposed by the OrderProcessingService, which runs continuously in the background.
 
 ## Monitoring and Metrics
 
@@ -167,12 +170,9 @@ The system uses Prometheus for metrics collection and Grafana for visualization:
      evaluation_interval: 15s
 
    scrape_configs:
-     - job_name: 'order-processing'
+     - job_name: 'order_processing_service'
        static_configs:
-         - targets: ['localhost:9090']
-     - job_name: 'order-submission'
-       static_configs:
-         - targets: ['localhost:9091']
+         - targets: ['host.docker.internal:9101']
    ```
 
 2. Grafana dashboards:
@@ -183,18 +183,47 @@ The system uses Prometheus for metrics collection and Grafana for visualization:
 
 ### Collected Metrics
 
-1. OrderProcessingService:
+All metrics are collected and exposed by OrderProcessingService:
+
+1. Order Creation:
+   - Number of created orders
+   - Number of failed submissions
+
+2. Order Processing:
    - Number of processed orders
    - Number of failed orders
    - Order processing time (histogram)
    - Number of duplicate orders
-   - MQTT connection status
+   - Service health status
 
-2. OrderSubmissionService:
-   - Number of submitted orders
-   - Number of failed submissions
-   - Submission time (histogram)
-   - MQTT connection status
+### Example Prometheus Queries
+
+Common PromQL queries for monitoring the system:
+
+1. Order Creation Rate (orders/minute):
+   ```promql
+   rate(created_orders_total{job="order_processing_service"}[1m])
+   ```
+
+2. Failed Orders Percentage:
+   ```promql
+   (rate(failed_orders_total{job="order_processing_service"}[5m]) / rate(processed_orders_total{job="order_processing_service"}[5m])) * 100
+   ```
+
+3. Average Processing Time (last 5 minutes):
+   ```promql
+   rate(order_processing_duration_seconds_sum{job="order_processing_service"}[5m]) / rate(order_processing_duration_seconds_count{job="order_processing_service"}[5m])
+   ```
+
+4. Service Health Status (1 = healthy, 0 = unhealthy):
+   ```promql
+   service_health_status{job="order_processing_service"}
+   ```
+
+5. High Processing Time Alert:
+   ```promql
+   histogram_quantile(0.95, rate(order_processing_duration_seconds_bucket{job="order_processing_service"}[5m])) > 5
+   ```
 
 ### Monitoring Setup
 
@@ -210,11 +239,15 @@ The system uses Prometheus for metrics collection and Grafana for visualization:
 
 3. Open Grafana in browser:
    - URL: http://localhost:3000
-   - Default credentials: admin/admin
+   - Default credentials:
+     * Username: admin
+     * Password: admin
+   - **Note**: It is highly recommended to change the default password after first login for security purposes.
 
-4. Import ready-made dashboards:
-   - Navigate to Dashboards > Import
-   - Load dashboard definitions from `grafana/dashboards/`
+4. Monitor metrics directly:
+   - OrderProcessingService metrics: http://localhost:9101/metrics
+   - Prometheus: http://localhost:9090 (aggregated metrics)
+   - Grafana: http://localhost:3000 (dashboards)
 
 ### Alert Configuration
 

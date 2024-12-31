@@ -11,23 +11,21 @@ public class OrderServiceTests
 {
     private readonly Mock<IMqttPublisherService> _publisherMock;
     private readonly Mock<ILogger<OrderService>> _loggerMock;
-    private readonly Mock<IMetricsService> _metricsMock;
     private readonly OrderService _orderService;
 
     public OrderServiceTests()
     {
         _publisherMock = new Mock<IMqttPublisherService>();
         _loggerMock = new Mock<ILogger<OrderService>>();
-        _metricsMock = new Mock<IMetricsService>();
-        _orderService = new OrderService(_publisherMock.Object, _loggerMock.Object, _metricsMock.Object);
+        _orderService = new OrderService(_publisherMock.Object, _loggerMock.Object);
     }
 
     [Fact]
     public async Task CreateOrderAsync_ValidInput_CreatesAndPublishesOrder()
     {
         // Arrange
-        var customerName = "Testi Asiakas";
-        var productName = "Testi Tuote";
+        var customerName = "Test Customer";
+        var productName = "Test Product";
 
         // Act
         var result = await _orderService.CreateOrderAsync(customerName, productName);
@@ -43,15 +41,13 @@ public class OrderServiceTests
             It.IsAny<string>(),
             It.Is<string>(msg => msg.Contains(result.OrderId))), 
             Times.Once);
-
-        _metricsMock.Verify(x => x.IncrementOrdersCreated(), Times.Once);
     }
 
     [Theory]
-    [InlineData("", "Tuote")]
-    [InlineData("Asiakas", "")]
-    [InlineData(null, "Tuote")]
-    [InlineData("Asiakas", null)]
+    [InlineData("", "Product")]
+    [InlineData("Customer", "")]
+    [InlineData(null, "Product")]
+    [InlineData("Customer", null)]
     public async Task CreateOrderAsync_InvalidInput_ThrowsArgumentException(string customerName, string productName)
     {
         // Act & Assert
@@ -62,8 +58,6 @@ public class OrderServiceTests
             It.IsAny<string>(), 
             It.IsAny<string>()), 
             Times.Never);
-
-        _metricsMock.Verify(x => x.IncrementOrdersCreated(), Times.Never);
     }
 
     [Fact]
@@ -72,12 +66,10 @@ public class OrderServiceTests
         // Arrange
         _publisherMock
             .Setup(x => x.PublishAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ThrowsAsync(new Exception("Julkaisu epäonnistui"));
+            .ThrowsAsync(new Exception("Publishing failed"));
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(() => 
-            _orderService.CreateOrderAsync("Asiakas", "Tuote"));
-
-        _metricsMock.Verify(x => x.IncrementOrdersCreated(), Times.Never);
+            _orderService.CreateOrderAsync("Customer", "Product"));
     }
 } 

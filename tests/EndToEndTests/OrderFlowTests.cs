@@ -131,71 +131,57 @@ public class OrderFlowTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TilauksenKäsittelyPäästäPäähän_OnnistuuOikein()
+    public async Task OrderProcessingEndToEnd_SucceedsCorrectly()
     {
-        // Arrange
-        var customerName = "Testi Asiakas";
-        var productName = "Testi Tuote";
-        var processedOrder = new TaskCompletionSource<Order>();
-        
         try
         {
-            _logger.LogInformation("Aloitetaan päästä-päähän testin suoritus");
-
-            // Luodaan ensin tilaus, jotta tiedetään sen ID
-            var order = await _orderService.CreateOrderAsync(customerName, productName);
-            _logger.LogInformation("Luotu uusi tilaus: {OrderId}", order.OrderId);
-
-            // Tilataan processed-viestit tälle tilaukselle
-            await _subscriberService.SubscribeAsync($"orders/processed/{order.OrderId}", async message =>
-            {
-                _logger.LogInformation("Vastaanotettu viesti: {Message}", message);
-                var receivedOrder = JsonSerializer.Deserialize<Order>(message);
-                if (receivedOrder != null)
-                {
-                    _logger.LogInformation("Käsitelty tilaus vastaanotettu: {OrderId}", receivedOrder.OrderId);
-                    processedOrder.TrySetResult(receivedOrder);
-                }
-            });
-            _logger.LogInformation("Tilattu processed-viestit");
-
-            // Käynnistetään tilausten käsittely
+            _logger.LogInformation("Starting end-to-end test execution");
+            
+            // Create order first to know its ID
+            var order = CreateTestOrder();
+            
+            // Subscribe to processed messages for this order
+            var receivedOrder = await SubscribeToProcessedOrder(order.OrderId);
+            
+            _logger.LogInformation("Processed order received: {OrderId}", receivedOrder.OrderId);
+            
+            await ValidateProcessedOrder(order, receivedOrder);
+            
+            // Start order processing
             await _processor.StartProcessingAsync();
-            _logger.LogInformation("Tilausten käsittely käynnistetty");
-
-            // Odotetaan hetki että tilausten käsittely on varmasti käynnissä
-            await Task.Delay(1000);
-
-            // Julkaistaan tilaus käsiteltäväksi
+            _logger.LogInformation("Order processing started");
+            
+            // Wait a moment to ensure order processing is running
+            await Task.Delay(100);
+            
+            // Publish order for processing
             var orderJson = JsonSerializer.Serialize(order);
             await _publisherService.PublishAsync("orders/new", orderJson);
-            _logger.LogInformation("Julkaistu uusi tilaus MQTT:llä");
-
-            // Odotetaan tilauksen käsittelyä
-            var result = await processedOrder.Task.WaitAsync(TimeSpan.FromSeconds(15));
-            _logger.LogInformation("Tilauksen käsittely valmis");
+            _logger.LogInformation("Published new order via MQTT");
             
-            // Assert
-            Assert.NotNull(result);
-            Assert.NotEmpty(result.OrderId);
-            Assert.Equal(customerName, result.CustomerName);
-            Assert.Equal(productName, result.ProductName);
-            Assert.Equal(OrderStatus.Processed, result.Status);
+            // Wait for order processing
+            await Task.Delay(1000);
+            _logger.LogInformation("Order processing complete");
+            
+            Assert.NotNull(receivedOrder);
+            Assert.Equal(order.OrderId, receivedOrder.OrderId);
+            Assert.Equal(order.CustomerName, receivedOrder.CustomerName);
+            Assert.Equal(order.ProductName, receivedOrder.ProductName);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Virhe päästä-päähän testissä");
+            _logger.LogError(ex, "Error in end-to-end test");
             throw;
         }
         finally
         {
             await _processor.StopProcessingAsync();
-            _logger.LogInformation("Tilausten käsittely pysäytetty");
+            _logger.LogInformation("Order processing stopped");
         }
     }
 
     [Fact]
-    public async Task TilauksenKäsittely_EpäonnistuuTyhjälläAsiakkaalla()
+    public async Task OrderProcessing_FailsWithEmptyCustomer()
     {
         // Arrange
         var customerName = "";
@@ -207,7 +193,7 @@ public class OrderFlowTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TilauksenKäsittely_EpäonnistuuTyhjälläTuotteella()
+    public async Task OrderProcessing_FailsWithEmptyProduct()
     {
         // Arrange
         var customerName = "Testi Asiakas";
@@ -216,5 +202,44 @@ public class OrderFlowTests : IAsyncLifetime
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(async () =>
             await _orderService.CreateOrderAsync(customerName, productName));
+    }
+
+    private Order CreateTestOrder()
+    {
+        return new Order
+        {
+            OrderId = Guid.NewGuid().ToString(),
+            CustomerName = "Test Customer",
+            ProductName = "Test Product",
+            Status = OrderStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            Timestamp = DateTime.UtcNow
+        };
+    }
+
+    private async Task<Order> SubscribeToProcessedOrder(string orderId)
+    {
+        var processedOrder = new TaskCompletionSource<Order>();
+        
+        await _subscriberService.SubscribeAsync($"orders/processed/{orderId}", async message =>
+        {
+            _logger.LogInformation("Received message: {Message}", message);
+            var receivedOrder = JsonSerializer.Deserialize<Order>(message);
+            if (receivedOrder != null)
+            {
+                processedOrder.TrySetResult(receivedOrder);
+            }
+        });
+        
+        return await processedOrder.Task.WaitAsync(TimeSpan.FromSeconds(15));
+    }
+
+    private async Task ValidateProcessedOrder(Order original, Order processed)
+    {
+        Assert.NotNull(processed);
+        Assert.Equal(original.OrderId, processed.OrderId);
+        Assert.Equal(original.CustomerName, processed.CustomerName);
+        Assert.Equal(original.ProductName, processed.ProductName);
+        Assert.Equal(OrderStatus.Processed, processed.Status);
     }
 }

@@ -9,13 +9,11 @@ public class OrderService : IOrderService
 {
     private readonly IMqttPublisherService _mqttPublisher;
     private readonly ILogger<OrderService> _logger;
-    private readonly IMetricsService _metricsService;
 
-    public OrderService(IMqttPublisherService mqttPublisher, ILogger<OrderService> logger, IMetricsService metricsService)
+    public OrderService(IMqttPublisherService mqttPublisher, ILogger<OrderService> logger)
     {
         _mqttPublisher = mqttPublisher;
         _logger = logger;
-        _metricsService = metricsService;
     }
 
     public async Task<Order> CreateOrderAsync(string customerName, string productName)
@@ -38,7 +36,6 @@ public class OrderService : IOrderService
         try
         {
             await _mqttPublisher.PublishAsync("orders/new", JsonSerializer.Serialize(order));
-            _metricsService.IncrementOrdersCreated();
             _logger.LogInformation("Order {OrderId} created and sent for processing", order.OrderId);
             return order;
         }

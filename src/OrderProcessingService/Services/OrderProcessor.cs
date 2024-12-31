@@ -36,7 +36,7 @@ public class OrderProcessor
 
         try
         {
-            // Muodostetaan MQTT-yhteydet vain jos niitä ei ole vielä muodostettu
+            // Initialize MQTT connections only if they haven't been initialized yet
             if (!_subscriber.IsConnected)
             {
                 await _subscriber.ConnectAsync();
@@ -48,7 +48,7 @@ public class OrderProcessor
             
             _isProcessing = true;
 
-            // Tilataan uudet tilaukset
+            // Subscribe to new orders
             await _subscriber.SubscribeAsync("orders/new", async message =>
             {
                 try
@@ -62,7 +62,10 @@ public class OrderProcessor
                         return;
                     }
 
-                    // Tarkistetaan onko tilaus jo käsitelty
+                    // Track new order creation
+                    _metrics.IncrementOrdersCreated();
+
+                    // Check if order has already been processed
                     if (_processedOrders.TryGetValue(order.OrderId, out var processedTime))
                     {
                         if (DateTime.UtcNow - processedTime < TimeSpan.FromMinutes(5))
@@ -79,19 +82,19 @@ public class OrderProcessor
 
                     try
                     {
-                        // Simuloidaan käsittelyä
-                        await Task.Delay(2000);
+                        // Simulate processing
+                        await Task.Delay(1000);
 
                         order.Status = OrderStatus.Processed;
                         await _publisher.PublishAsync($"orders/processed/{order.OrderId}", 
                             JsonSerializer.Serialize(order));
 
-                        // Merkitään tilaus käsitellyksi
+                        // Mark order as processed
                         _processedOrders.TryAdd(order.OrderId, DateTime.UtcNow);
                         _metrics.IncrementProcessedOrders();
                         _metrics.RecordProcessingTime(order.OrderId, DateTime.UtcNow - startTime);
 
-                        // Siivotaan vanhat tilaukset (yli 5 minuuttia vanhat)
+                        // Clean up old orders (older than 5 minutes)
                         foreach (var processedOrder in _processedOrders.ToList())
                         {
                             if (DateTime.UtcNow - processedOrder.Value > TimeSpan.FromMinutes(5))

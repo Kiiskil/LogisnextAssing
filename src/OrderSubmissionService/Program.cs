@@ -5,8 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OrderSubmissionService.Services;
-using Prometheus;
-using System.Text.Json;
 
 var builder = Host.CreateDefaultBuilder(args);
 
@@ -24,13 +22,9 @@ builder.ConfigureServices((hostContext, services) =>
         ?? throw new InvalidOperationException("MqttSettings puuttuu konfiguraatiosta");
     services.AddSingleton(mqttSettings);
     
-    services.AddSingleton<Common.Services.IMetricsService, Common.Services.PrometheusMetricsService>();
-    services.AddSingleton<Common.Services.IMqttPublisherService, Common.Services.MqttPublisherService>();
+    services.AddSingleton<IMetricsService, DummyMetricsService>();
+    services.AddSingleton<IMqttPublisherService, MqttPublisherService>();
     services.AddSingleton<OrderService>();
-    
-    var metricsPort = hostContext.Configuration.GetValue<int>("Metrics:Port");
-    var server = new MetricServer(port: metricsPort);
-    server.Start();
 });
 
 var host = builder.Build();
@@ -47,17 +41,13 @@ try
     var productName = args[2];
 
     var orderService = host.Services.GetRequiredService<OrderService>();
-    var mqttService = host.Services.GetRequiredService<Common.Services.IMqttPublisherService>();
+    var mqttService = host.Services.GetRequiredService<IMqttPublisherService>();
     var logger = host.Services.GetRequiredService<ILogger<Program>>();
 
     await mqttService.ConnectAsync();
 
     var order = await orderService.CreateOrderAsync(customerName, productName);
-    logger.LogInformation("Order created. Order ID: {OrderId}", order.OrderId);
-
-    // Julkaistaan tilaus
-    await mqttService.PublishAsync("orders/new", JsonSerializer.Serialize(order));
-    logger.LogInformation("Order {OrderId} sent for processing", order.OrderId);
+    logger.LogInformation("Order created and sent for processing. Order ID: {OrderId}", order.OrderId);
 
     // Odotetaan valmistumista tai aikakatkaisua
     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

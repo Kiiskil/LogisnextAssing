@@ -30,7 +30,7 @@ public class MqttPublisherService : IMqttPublisherService
                 retryAttempt => TimeSpan.FromSeconds(_settings.RetryPolicy.DelaySeconds * retryAttempt),
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
-                    _logger.LogWarning(exception, "Yritys {RetryCount} epäonnistui. Odotetaan {DelaySeconds} sekuntia ennen uutta yritystä.",
+                    _logger.LogWarning(exception, "Attempt {RetryCount} failed. Waiting {DelaySeconds} seconds before retrying.",
                         retryCount, timeSpan.TotalSeconds);
                 });
     }
@@ -77,7 +77,7 @@ public class MqttPublisherService : IMqttPublisherService
         {
             if (!_mqttClient.IsConnected)
             {
-                _logger.LogWarning("MQTT-yhteys katkesi. Yritetään yhdistää uudelleen...");
+                _logger.LogWarning("MQTT connection lost. Attempting to reconnect...");
                 await ConnectAsync();
             }
 

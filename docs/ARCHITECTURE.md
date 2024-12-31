@@ -1,66 +1,109 @@
-# Real-Time Order Processing System - Arkkitehtuurikuvaus
+# Arkkitehtuuridokumentaatio
 
 ## Yleiskuvaus
-Järjestelmä koostuu kahdesta mikropalvelusta, jotka kommunikoivat keskenään viestijonon välityksellä. Järjestelmä on suunniteltu skaalautuvaksi ja modulaariseksi.
+
+Järjestelmä koostuu kahdesta mikropalvelusta, jotka kommunikoivat keskenään MQTT-viestijonon välityksellä. Järjestelmä on suunniteltu skaalautuvaksi ja vikasietoiseksi.
 
 ## Komponentit
 
-### 1. Order Submission Service
-- Konsolisovellus, joka vastaanottaa tilauksia
-- Julkaisee tilaukset viestijonoon
-- Käsittelee tilausten validoinnin ja ID:n generoinnin
-- Vastaa tilaustietojen formaatin oikeellisuudesta
+### OrderSubmissionService
 
-### 2. Order Processing Service
-- Konsolisovellus, joka käsittelee tilauksia
-- Kuuntelee viestijonoa uusien tilausten varalta
-- Prosessoi tilaukset ja päivittää niiden tilan
-- Lokittaa käsitellyt tilaukset
+- Vastaanottaa tilaukset REST-rajapinnan kautta
+- Validoi tilaukset
+- Generoi yksilölliset tilaus-ID:t
+- Julkaisee tilaukset MQTT-jonoon
+- Kerää metriikat Prometheukseen
 
-### 3. Message Queue (MQTT)
-- Keskitetty viestinvälitysjärjestelmä
-- Käytetään MQTTnet-kirjastoa
-- Mahdollistaa asynkronisen kommunikaation palveluiden välillä
-- Tukee useita yhtäaikaisia julkaisijoita ja tilaajia
+Teknologiat:
+- .NET 8.0
+- MQTTnet
+- Prometheus-net
+- Polly (uudelleenyritykset)
 
-## Tekninen toteutus
+### OrderProcessingService
 
-### Viestiformaatti
-```json
-{
-    "orderId": "string",
-    "customerName": "string",
-    "productName": "string",
-    "timestamp": "datetime",
-    "status": "string"
-}
-```
+- Kuuntelee MQTT-jonoa
+- Käsittelee tilaukset
+- Päivittää tilausten tilan
+- Kerää metriikat Prometheukseen
 
-### Viestijonon topicit
-- orders/new: Uudet tilaukset
-- orders/processed: Käsitellyt tilaukset
+Teknologiat:
+- .NET 8.0
+- MQTTnet
+- Prometheus-net
+- Polly (uudelleenyritykset)
 
-## Skaalautuvuus
-- Palvelut ovat tilattomia ja voidaan skaalata horisontaalisesti
-- Viestijonon avulla voidaan käsitellä useita tilauksia rinnakkain
-- Useita Order Processing Service -instansseja voi kuunnella samaa jonoa
+### Infrastruktuuri
 
-## Virheenkäsittely
-- Palvelut käsittelevät yhteysongelmat viestijonoon
-- Epäonnistuneet tilaukset lokitetaan
-- Uudelleenyrityslogiikka viestijonoyhteyksille
+#### MQTT Broker (Eclipse Mosquitto)
 
-## Monitorointi
-- Palvelut tuottavat lokitietoja toiminnastaan
-- Tilausten käsittelyaikoja seurataan
-- Viestijonon tilaa monitoroidaan
+- Toimii viestijonona palveluiden välillä
+- Tukee QoS-tasoja (At least once)
+- Mahdollisuus TLS-salaukseen
+- Tukee pysyvää tallennusta
+
+#### Prometheus
+
+- Kerää metriikat molemmista palveluista
+- Tukee hälytysten määrittelyä
+- Tarjoaa PromQL-kyselykielen
+
+#### Grafana
+
+- Visualisoi Prometheuksen metriikat
+- Tukee dashboardien luontia
+- Mahdollisuus hälytysten konfigurointiin
 
 ## Tietoturva
-- Viestijonoyhteydet suojataan TLS:llä
-- Viestit validoidaan ennen käsittelyä
-- Käyttäjäsyötteet sanitoidaan
 
-## Testaus
-- Yksikkötestit komponenteille
-- Integraatiotestit palveluiden väliselle kommunikaatiolle
-- End-to-end testit koko tilausputkelle 
+### TLS-salaus
+
+- MQTT-yhteydet voidaan salata TLS:llä
+- Tuki sertifikaattien validoinnille
+- Mahdollisuus käyttäjätunnistukseen
+
+### Metriikat
+
+- Prometheus-portit vain sisäverkossa
+- Basic Authentication Grafanassa
+- HTTPS-tuki Grafanalle
+
+## Skaalautuvuus
+
+### Horisontaalinen skaalaus
+
+- OrderSubmissionService voidaan skaalata usealle instanssille
+- OrderProcessingService voidaan skaalata usealle instanssille
+- MQTT-broker tukee klusterointia
+
+### Vikasietoisuus
+
+- Uudelleenyrityslogiikka Polly-kirjastolla
+- MQTT QoS-taso varmistaa viestien perillemenon
+- Prometheus-metriikat auttavat ongelmien havaitsemisessa
+
+## Monitorointi
+
+### Metriikat
+
+- Käsiteltyjen tilausten määrä
+- Epäonnistuneiden tilausten määrä
+- Tilausten käsittelyaika
+- Jonon pituus
+- Uudelleenyritysten määrä
+
+### Lokitus
+
+- Strukturoitu lokitus
+- Eri lokitustasot (Info, Warning, Error)
+- Mahdollisuus keskitettyyn lokienhallintaan
+
+## Jatkokehitys
+
+1. Integraatiotestit Docker-pohjaisella MQTT-brokerilla
+2. End-to-end testit
+3. Metriikoiden visualisointi Grafanassa
+4. TLS-sertifikaattien käyttöönotto
+5. Uudelleenyrityslogiikan laajentaminen
+6. Keskitetty lokienhallinta
+7. Automaattinen skaalaus 

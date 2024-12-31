@@ -1,171 +1,213 @@
-# Real-Time Order Processing System - Tekninen suunnitelma
+# Tekninen dokumentaatio
 
-## Projektin rakenne
+## Palveluiden rakenne
 
-```
-LogisnextAssing/
-├── src/
-│   ├── OrderSubmissionService/
-│   │   ├── Program.cs
-│   │   ├── Services/
-│   │   │   ├── OrderService.cs
-│   │   │   └── MqttPublisherService.cs
-│   │   ├── Models/
-│   │   │   └── Order.cs
-│   │   └── OrderSubmissionService.csproj
-│   │
-│   └── OrderProcessingService/
-│       ├── Program.cs
-│       ├── Services/
-│       │   ├── OrderProcessingService.cs
-│       │   └── MqttSubscriberService.cs
-│       ├── Models/
-│       │   └── Order.cs
-│       └── OrderProcessingService.csproj
-│
-├── tests/
-│   ├── OrderSubmissionService.Tests/
-│   └── OrderProcessingService.Tests/
-│
-└── shared/
-    └── Common/
-        ├── Models/
-        │   └── Order.cs
-        └── Common.csproj
-```
+### OrderSubmissionService
 
-## Teknologiavalinnat
+#### Komponentit
 
-### Ohjelmointikieli ja framework
-- C# 12
-- .NET 8
-- Microsoft.Extensions.DependencyInjection
-- Microsoft.Extensions.Logging
+1. `Program.cs`
+   - Konfiguraation lataus
+   - DI-konttien rekisteröinti
+   - Metriikoiden alustus
+   - Palvelun elinkaaren hallinta
 
-### Viestijonotekniikka
-- MQTTnet 4.3.1.873
-- MQTTnet.Extensions.ManagedClient
+2. `MqttPublisherService`
+   - MQTT-yhteyden hallinta
+   - Viestien julkaisu
+   - Uudelleenyrityslogiikka
+   - Metriikoiden keräys
 
-### Testaus
-- xUnit
-- Moq
-- FluentAssertions
+3. `OrderService`
+   - Tilausten validointi
+   - ID:n generointi
+   - Tilausten muotoilu
 
-## Luokkarakenne
+#### Konfiguraatio
 
-### Order-malli
-```csharp
-public class Order
-{
-    public string OrderId { get; set; }
-    public string CustomerName { get; set; }
-    public string ProductName { get; set; }
-    public DateTime Timestamp { get; set; }
-    public OrderStatus Status { get; set; }
-}
-
-public enum OrderStatus
-{
-    New,
-    Processing,
-    Processed,
-    Failed
-}
-```
-
-### Palvelurajapinnat
-
-#### IOrderService
-```csharp
-public interface IOrderService
-{
-    Task<Order> CreateOrderAsync(string customerName, string productName);
-    Task<bool> ValidateOrderAsync(Order order);
-}
-```
-
-#### IMqttPublisherService
-```csharp
-public interface IMqttPublisherService
-{
-    Task ConnectAsync();
-    Task PublishAsync(string topic, string message);
-    Task DisconnectAsync();
-}
-```
-
-#### IOrderProcessingService
-```csharp
-public interface IOrderProcessingService
-{
-    Task ProcessOrderAsync(Order order);
-    Task UpdateOrderStatusAsync(Order order, OrderStatus status);
-}
-```
-
-## Konfiguraatio
-
-### MQTT-asetukset
 ```json
 {
-    "MqttSettings": {
-        "BrokerAddress": "localhost",
-        "BrokerPort": 1883,
-        "ClientId": "service-name",
-        "Username": "",
-        "Password": "",
-        "UseTls": false
+  "MqttSettings": {
+    "BrokerAddress": "localhost",
+    "BrokerPort": 1883,
+    "ClientId": "order-submission-service",
+    "Username": "",
+    "Password": "",
+    "UseTls": false,
+    "RetryPolicy": {
+      "MaxRetries": 3,
+      "DelaySeconds": 5
     }
+  },
+  "Metrics": {
+    "Enabled": true,
+    "Port": 9100
+  }
 }
 ```
 
-## Virheenkäsittely
+### OrderProcessingService
 
-### Poikkeusluokat
-```csharp
-public class OrderValidationException : Exception
-{
-    public OrderValidationException(string message) : base(message) { }
-}
+#### Komponentit
 
-public class MqttConnectionException : Exception
+1. `Program.cs`
+   - Konfiguraation lataus
+   - DI-konttien rekisteröinti
+   - Metriikoiden alustus
+   - Palvelun elinkaaren hallinta
+
+2. `MqttSubscriberService`
+   - MQTT-yhteyden hallinta
+   - Viestien vastaanotto
+   - Uudelleenyrityslogiikka
+   - Metriikoiden keräys
+
+3. `OrderProcessingService`
+   - Tilausten käsittely
+   - Tilan päivitys
+   - Virheenkäsittely
+
+#### Konfiguraatio
+
+```json
 {
-    public MqttConnectionException(string message, Exception innerException) 
-        : base(message, innerException) { }
+  "MqttSettings": {
+    "BrokerAddress": "localhost",
+    "BrokerPort": 1883,
+    "ClientId": "order-processing-service",
+    "Username": "",
+    "Password": "",
+    "UseTls": false,
+    "RetryPolicy": {
+      "MaxRetries": 3,
+      "DelaySeconds": 5
+    }
+  },
+  "Metrics": {
+    "Enabled": true,
+    "Port": 9101
+  }
 }
 ```
 
-## Lokitus
+### Common-kirjasto
 
-### Lokitustasot
-- Information: Normaalit operaatiot
-- Warning: Lievät virhetilanteet
-- Error: Vakavat virheet
-- Debug: Kehitysaikaiset lokitukset
+#### Models
 
-## Testausstrategia
+1. `Order`
+   - Tilauksen perustiedot
+   - Validointisäännöt
+
+2. `MqttSettings`
+   - MQTT-konfiguraatio
+   - TLS-asetukset
+   - Uudelleenyritysasetukset
+
+3. `RetryPolicy`
+   - Uudelleenyritysasetukset
+   - Viiveet ja yrityskerrat
+
+#### Services
+
+1. `IMetricsService`
+   - Metriikoiden rajapinta
+   - Tilausten seuranta
+   - Suorituskyvyn mittaus
+
+2. `PrometheusMetricsService`
+   - Prometheus-metriikat
+   - Laskurit ja mittarit
+   - Histogrammit
+
+## Infrastruktuuri
+
+### Docker-kontit
+
+1. MQTT Broker
+   ```yaml
+   mqtt:
+     image: eclipse-mosquitto:latest
+     ports:
+       - "1883:1883"
+       - "9001:9001"
+     volumes:
+       - ./mosquitto/config:/mosquitto/config
+       - ./mosquitto/data:/mosquitto/data
+       - ./mosquitto/log:/mosquitto/log
+   ```
+
+2. Prometheus
+   ```yaml
+   prometheus:
+     image: prom/prometheus:latest
+     ports:
+       - "9090:9090"
+     volumes:
+       - ./prometheus:/etc/prometheus
+     command:
+       - '--config.file=/etc/prometheus/prometheus.yml'
+   ```
+
+3. Grafana
+   ```yaml
+   grafana:
+     image: grafana/grafana:latest
+     ports:
+       - "3000:3000"
+     environment:
+       - GF_SECURITY_ADMIN_PASSWORD=admin
+     volumes:
+       - ./grafana:/var/lib/grafana
+   ```
+
+### Prometheus-konfiguraatio
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'order_submission_service'
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+
+  - job_name: 'order_processing_service'
+    static_configs:
+      - targets: ['host.docker.internal:9101']
+```
+
+## Testaus
 
 ### Yksikkötestit
-- OrderService-luokan testit
-- Validointilogiikan testit
-- MQTT-palveluiden mock-testit
+
+1. OrderSubmissionService.Tests
+   - Tilausten validointi
+   - MQTT-julkaisu
+   - Metriikat
+
+2. OrderProcessingService.Tests
+   - Tilausten käsittely
+   - MQTT-tilaus
+   - Metriikat
 
 ### Integraatiotestit
-- Viestijonon toiminnan testaus
-- Palveluiden välisen kommunikaation testaus
 
-### End-to-end testit
-- Koko tilausputken testaus
-- Virhetilanteiden testaus
+1. MQTT-integraatio
+   - Viestien välitys
+   - QoS-tasot
+   - Uudelleenyritykset
 
-## Suorituskyky ja skaalautuvuus
+2. Metriikat
+   - Prometheus-integraatio
+   - Mittareiden tarkkuus
 
-### Viestijonon asetukset
-- QoS-taso: 1 (At least once)
-- Keep-alive: 60 sekuntia
-- Clean session: true
+## Jatkokehitys
 
-### Rinnakkaisuus
-- Async/await kaikkialla
-- Säikeistys tarvittaessa
-- Tilaton toteutus 
+1. Integraatiotestit Docker-pohjaisella MQTT-brokerilla
+2. End-to-end testit
+3. Metriikoiden visualisointi Grafanassa
+4. TLS-sertifikaattien käyttöönotto
+5. Uudelleenyrityslogiikan laajentaminen
+6. Keskitetty lokienhallinta
+7. Automaattinen skaalaus 

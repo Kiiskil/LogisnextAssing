@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OrderProcessingService.Services;
 using Prometheus;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = Host.CreateDefaultBuilder(args);
 
@@ -35,6 +36,11 @@ builder.ConfigureServices((hostContext, services) =>
 
     services.AddHealthChecks()
         .AddCheck<PrometheusMetricsService>("metrics_health");
+
+    services.AddSingleton<IHealthCheck>(sp => sp.GetRequiredService<IMetricsService>() as PrometheusMetricsService 
+        ?? throw new InvalidOperationException("PrometheusMetricsService not registered correctly"));
+
+    services.AddHostedService<HealthCheckBackgroundService>();
 });
 
 var host = builder.Build();

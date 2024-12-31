@@ -126,6 +126,31 @@ Oletusasetukset:
 }
 ```
 
+### Metriikoiden konfigurointi
+Metriikoiden asetukset löytyvät `appsettings.json`-tiedostoista:
+
+```json
+{
+  "MetricsSettings": {
+    "Port": 9090,
+    "Path": "/metrics",
+    "Prefix": "order_processing",
+    "Tags": {
+      "environment": "production",
+      "service": "order-processing"
+    },
+    "EnableHealthCheck": true
+  }
+}
+```
+
+Tärkeimmät asetukset:
+- `Port`: Prometheus metrics endpoint portti
+- `Path`: Metrics endpointin polku
+- `Prefix`: Metriikkojen etuliite Prometheuksessa
+- `Tags`: Yleiset tagit kaikille metriikoille
+- `EnableHealthCheck`: Health check -endpointin käyttöönotto
+
 ### Mosquitto-konfiguraatio
 Mosquitto-brokerin konfiguraatio löytyy tiedostosta:
 - Windows: `C:\Program Files\mosquitto\mosquitto.conf`
@@ -138,6 +163,76 @@ max_inflight_messages 100
 allow_anonymous true
 listener 1883
 ```
+
+## Monitorointi ja metriikat
+
+### Prometheus ja Grafana
+
+Järjestelmä käyttää Prometheusta metriikoiden keräämiseen ja Grafanaa niiden visualisointiin:
+
+1. Prometheus-asetukset:
+   ```yaml
+   global:
+     scrape_interval: 15s
+     evaluation_interval: 15s
+
+   scrape_configs:
+     - job_name: 'order-processing'
+       static_configs:
+         - targets: ['localhost:9090']
+     - job_name: 'order-submission'
+       static_configs:
+         - targets: ['localhost:9091']
+   ```
+
+2. Grafana-dashboardit:
+   - Tilausten käsittelyajat
+   - Onnistuneet/epäonnistuneet tilaukset
+   - Jonon pituus
+   - Palveluiden tila
+
+### Kerättävät metriikat
+
+1. OrderProcessingService:
+   - Käsiteltyjen tilausten määrä
+   - Epäonnistuneiden tilausten määrä
+   - Tilausten käsittelyaika (histogrammi)
+   - Duplikaattitilausten määrä
+   - MQTT-yhteyden tila
+
+2. OrderSubmissionService:
+   - Lähetettyjen tilausten määrä
+   - Epäonnistuneiden lähetysten määrä
+   - Lähetysaika (histogrammi)
+   - MQTT-yhteyden tila
+
+### Monitoroinnin käyttöönotto
+
+1. Käynnistä Prometheus:
+   ```bash
+   docker-compose up -d prometheus
+   ```
+
+2. Käynnistä Grafana:
+   ```bash
+   docker-compose up -d grafana
+   ```
+
+3. Avaa Grafana selaimessa:
+   - URL: http://localhost:3000
+   - Oletustunnukset: admin/admin
+
+4. Tuo valmiit dashboardit:
+   - Navigoi Dashboards > Import
+   - Lataa dashboard-määritykset kansiosta `grafana/dashboards/`
+
+### Hälytysten konfigurointi
+
+Grafanassa voidaan määrittää hälytykset esimerkiksi:
+- Korkea virhemäärä (> 5% tilauksista)
+- Pitkä käsittelyaika (> 5s)
+- MQTT-yhteyden katkeaminen
+- Palvelun kaatuminen
 
 ## Vianetsintä
 
@@ -164,9 +259,19 @@ listener 1883
 │     Order       │     │              │     │      Order       │
 │   Submission    │────▶│    MQTT      │────▶│    Processing    │
 │    Service      │     │    Broker    │     │     Service      │
-└─────────────────┘     │  (Mosquitto) │     └──────────────────┘
-                        │              │
-                        └──────────────┘
+└─────────┬───────┘     │  (Mosquitto) │     └────────┬─────────┘
+          │             │              │              │
+          │             └──────────────┘              │
+          │                                          │
+          │             ┌──────────────┐             │
+          └────────────▶│  Prometheus  │◀────────────┘
+                       │              │
+                       └───────┬──────┘
+                              │
+                       ┌──────┴──────┐
+                       │   Grafana   │
+                       │             │
+                       └─────────────┘
 ```
 
 ### Prosessikuvaus

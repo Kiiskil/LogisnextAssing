@@ -31,6 +31,9 @@ builder.ConfigureServices((hostContext, services) =>
     var metricsPort = hostContext.Configuration.GetValue<int>("Metrics:Port");
     var server = new MetricServer(port: metricsPort);
     server.Start();
+
+    services.AddHealthChecks()
+        .AddCheck<PrometheusMetricsService>("metrics_health");
 });
 
 var host = builder.Build();

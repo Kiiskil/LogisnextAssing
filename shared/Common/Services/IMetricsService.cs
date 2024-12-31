@@ -7,4 +7,6 @@ public interface IMetricsService
     void IncrementFailedOrders();
     void RecordQueueLength(int length);
     void IncrementOrdersCreated();
+    void IncrementRetryAttempt(string operation);
+    void RecordRetryDelay(string operation, TimeSpan delay);
 } 

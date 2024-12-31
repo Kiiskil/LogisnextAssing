@@ -137,36 +137,30 @@ public class OrderFlowTests : IAsyncLifetime
         {
             _logger.LogInformation("Starting end-to-end test execution");
             
-            // Create order first to know its ID
-            var order = CreateTestOrder();
-            
-            // Subscribe to processed messages for this order
-            var receivedOrder = await SubscribeToProcessedOrder(order.OrderId);
-            
-            _logger.LogInformation("Processed order received: {OrderId}", receivedOrder.OrderId);
-            
-            await ValidateProcessedOrder(order, receivedOrder);
-            
-            // Start order processing
+            // Start order processing first
             await _processor.StartProcessingAsync();
             _logger.LogInformation("Order processing started");
             
             // Wait a moment to ensure order processing is running
-            await Task.Delay(100);
+            await Task.Delay(1000);
+            
+            // Create order
+            var order = CreateTestOrder();
+            
+            // Subscribe to processed messages for this order
+            var processedOrderTask = SubscribeToProcessedOrder(order.OrderId);
             
             // Publish order for processing
             var orderJson = JsonSerializer.Serialize(order);
             await _publisherService.PublishAsync("orders/new", orderJson);
             _logger.LogInformation("Published new order via MQTT");
             
-            // Wait for order processing
-            await Task.Delay(1000);
-            _logger.LogInformation("Order processing complete");
+            // Wait for processed order
+            var receivedOrder = await processedOrderTask;
+            _logger.LogInformation("Processed order received: {OrderId}", receivedOrder.OrderId);
             
-            Assert.NotNull(receivedOrder);
-            Assert.Equal(order.OrderId, receivedOrder.OrderId);
-            Assert.Equal(order.CustomerName, receivedOrder.CustomerName);
-            Assert.Equal(order.ProductName, receivedOrder.ProductName);
+            // Validate the result
+            await ValidateProcessedOrder(order, receivedOrder);
         }
         catch (Exception ex)
         {
